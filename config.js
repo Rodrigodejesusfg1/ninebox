@@ -6,8 +6,8 @@ window.ENV_CONFIG = {
     API_BASE_URL_DEV: 'http://localhost:8000/api',
     
     // Produção no Render
-    // IMPORTANTE: Substitua 'ninebox-api' pelo nome do seu serviço no Render
-    API_BASE_URL_PROD: 'https://ninebox-api.onrender.com/api',
+    // Substitua pela URL real da sua API
+    API_BASE_URL_PROD: 'https://avaliacaodedesempenhoreframax.onrender.com/api',
     
     // Detecta automaticamente o ambiente
     getApiUrl: function() {
