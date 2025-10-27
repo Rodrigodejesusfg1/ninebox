@@ -1,0 +1,43 @@
+# Arquivos que não devem ser enviados no deploy
+
+# Dados de desenvolvimento
+*.csv
+*.xlsx
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Scripts de teste
+test_*.py
+check_key.py
+api_requests.py
+
+# SQL
+*.sql
+
+# Configuração local
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Batch files
+*.bat

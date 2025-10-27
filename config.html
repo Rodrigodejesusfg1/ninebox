@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações - NineBox</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-logo">
+                <img src="REFRAMAX_.jpeg" alt="Reframax Logo">
+                <div class="header-title">
+                    <h1>Nine Box Matrix</h1>
+                    <p class="subtitle">Configurações</p>
+                </div>
+            </div>
+            <nav class="header-nav">
+                <a href="ninebox.html" class="nav-link">Nine Box</a>
+                <a href="config.html" class="nav-link active">Configurações</a>
+                <a href="dashboard.html" class="nav-link">Dashboard</a>
+                <a href="index.html" class="nav-link logout" onclick="try{localStorage.removeItem('auth_user')}catch(e){}">Sair</a>
+            </nav>
+        </header>
+
+        <div class="content">
+            <div class="config-section">
+                <h2>Ranking de Colaboradores na Matriz de Talentos</h2>
+                <p>Informe um número nos campos abaixo para calcularmos a posição dos colaboradores de forma decrescente em cada box da Matriz de Talentos. Nosso cálculo é: (fator de multiplicação EixoX × valor nota competência EixoX) + (fator de multiplicação EixoY × valor nota competência EixoY).</p>
+                
+                <div class="config-grid" style="grid-template-columns: 1fr 1fr; max-width: 600px; margin: 20px auto;">
+                    <div class="config-item">
+                        <label>Fator Desempenho</label>
+                        <input type="number" id="fator-desempenho" value="0" step="0.1">
+                    </div>
+                    <div class="config-item">
+                        <label>Fator Potencial</label>
+                        <input type="number" id="fator-potencial" value="0" step="0.1">
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h2>Layout dos Quadrantes</h2>
+                <p>Configure os quadrantes da Matriz de Talentos</p>
+                
+                <table class="config-table">
+                    <thead>
+                        <tr>
+                            <th>Título do quadrante</th>
+                            <th>Eixo X</th>
+                            <th>Eixo Y</th>
+                            <th>Cor do Quadrante</th>
+                            <th>Cor do Título</th>
+                        </tr>
+                    </thead>
+                    <tbody id="quadrantConfigTable">
+                        <!-- Será preenchido dinamicamente -->
+                    </tbody>
+                </table>
+
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="applyConfig()">Aplicar Configuração</button>
+                    <button class="btn btn-secondary" onclick="resetConfig()">Restaurar Padrões</button>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3>Como usar:</h3>
+                <p>1. Configure os fatores de multiplicação para o ranking</p>
+                <p>2. Personalize os quadrantes e suas cores</p>
+                <p>3. Clique em "Aplicar Configuração"</p>
+                <p>4. Acesse a página "Nine Box" para visualizar as mudanças</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

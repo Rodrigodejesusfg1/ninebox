@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - NineBox Reframax</title>
+    <link rel="stylesheet" href="login.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-left">
+            <div class="brand-section">
+                <img src="REFRAMAX_.jpeg" alt="Reframax Logo" class="logo">
+                <p class="tagline">Plataforma Estratégica de Pessoas</p>
+                <p class="cycle-title">Ciclo de Avaliação de Desempenho 2025</p>
+            </div>
+            <div class="features">
+                <div class="feature-item">
+                    <div class="feature-icon" aria-hidden="true">
+                        <svg viewBox="0 0 32 32" role="presentation" focusable="false">
+                            <g fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M6 26h20" />
+                                <rect x="8" y="14" width="4" height="8" rx="1" />
+                                <rect x="14" y="10" width="4" height="12" rx="1" />
+                                <rect x="20" y="6" width="4" height="16" rx="1" />
+                            </g>
+                        </svg>
+                    </div>
+                    <div class="feature-text">
+                        <h3>Análise Completa</h3>
+                        <p>Visualize desempenho e potencial de toda a equipe</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon" aria-hidden="true">
+                        <svg viewBox="0 0 32 32" role="presentation" focusable="false">
+                            <g fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="16" cy="16" r="9" />
+                                <circle cx="16" cy="16" r="5" />
+                                <path d="M16 11v5h5" />
+                            </g>
+                        </svg>
+                    </div>
+                    <div class="feature-text">
+                        <h3>Plano de Desenvolvimento</h3>
+                        <p>Crie e gerencie planos personalizados</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon" aria-hidden="true">
+                        <svg viewBox="0 0 32 32" role="presentation" focusable="false">
+                            <g fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="4" />
+                                <circle cx="22" cy="14" r="3" />
+                                <path d="M6 24c0-3.31 2.69-6 6-6s6 2.69 6 6" />
+                                <path d="M18 24c0-2.21 1.79-4 4-4s4 1.79 4 4" />
+                            </g>
+                        </svg>
+                    </div>
+                    <div class="feature-text">
+                        <h3>Planejamento de Sucessão</h3>
+                        <p>Identifique e prepare futuros líderes</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="login-right">
+            <div class="login-box">
+                <div class="login-header">
+                    <h2>Bem-vindo de volta!</h2>
+                    <p>Entre com suas credenciais para continuar</p>
+                </div>
+                
+                <form id="loginForm" class="login-form" novalidate>
+                    <div class="form-group">
+                        <label for="username">Usuário</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                                    <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-3.31 0-6 2.15-6 4.8a.2.2 0 0 0 .2.2h11.6a.2.2 0 0 0 .2-.2C18 16.15 15.31 14 12 14z" fill="#546e7a"/>
+                                </svg>
+                            </span>
+                            <input type="text" id="username" name="username" placeholder="Digite seu usuário" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Senha</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                                    <path d="M17 10h-1V7a4 4 0 0 0-8 0v3H7a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1zm-3 0H10V7a2 2 0 0 1 4 0zm-2 5a1.5 1.5 0 1 0 1.5 1.5A1.5 1.5 0 0 0 12 15z" fill="#546e7a"/>
+                                </svg>
+                            </span>
+                            <input type="password" id="password" name="password" placeholder="Digite sua senha" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-options">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="rememberMe">
+                            <span class="checkmark"></span>
+                            Lembrar-me
+                        </label>
+                        <a href="#" class="forgot-password">Esqueceu a senha?</a>
+                    </div>
+                    
+                    <button type="submit" class="btn-login">
+                        <span>Entrar</span>
+                        <span class="btn-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                                <path d="M5 12h12" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M13 6l6 6-6 6" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </span>
+                    </button>
+                </form>
+                <div id="loginError" class="form-error" role="alert" aria-live="polite" style="display:none;"></div>
+                
+                <div class="login-footer">
+                    <p>© 2025 Reframax. Todos os direitos reservados.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        const API_BASE_URL = window.ENV_CONFIG ? window.ENV_CONFIG.getApiUrl() : 'http://localhost:8000/api';
+
+        async function tryPostLogin(nome, senha) {
+            try {
+                const resp = await fetch(`${API_BASE_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome, senha })
+                });
+                if (!resp.ok) return { ok: false };
+                const json = await resp.json();
+                // Aceita diferentes formatos
+                const ok = json.authenticated || json.success || json.ok || false;
+                return { ok, data: json };
+            } catch { return { ok: false }; }
+        }
+
+        async function tryGetUsuarios(nome, senha) {
+            // Primeiro tenta filtrar por nome no servidor; se não der, busca lista e filtra localmente
+            const norm = s => (s || '').toString().trim();
+            const nomeN = norm(nome);
+            const senhaN = norm(senha);
+            try {
+                const byName = await fetch(`${API_BASE_URL}/usuarios?nome=${encodeURIComponent(nomeN)}`);
+                if (byName.ok) {
+                    const j = await byName.json();
+                    const arr = Array.isArray(j) ? j : (j.data || []);
+                    const found = arr.find(u => norm(u.nome) === nomeN && norm(u.senha) === senhaN);
+                    return { ok: Boolean(found), user: found };
+                }
+            } catch {}
+            try {
+                const all = await fetch(`${API_BASE_URL}/usuarios?limit=1000&offset=0`);
+                if (!all.ok) return { ok: false };
+                const j = await all.json();
+                const arr = Array.isArray(j) ? j : (j.data || []);
+                const found = arr.find(u => norm(u.nome) === nomeN && norm(u.senha) === senhaN);
+                return { ok: Boolean(found), user: found };
+            } catch { return { ok: false }; }
+        }
+
+        async function tryCsvUsuarios(nome, senha) {
+            const norm = s => (s || '').toString().trim();
+            try {
+                const resp = await fetch('usuarios.csv', { cache: 'no-store' });
+                if (!resp.ok) return { ok: false };
+                const text = await resp.text();
+                const lines = text.split(/\r?\n/).filter(l => l.trim());
+                if (lines.length === 0) return { ok: false };
+                // Detectar separador ; ou ,
+                const sep = lines[0].includes(';') ? ';' : ',';
+                const headers = lines[0].split(sep).map(h => h.trim().toLowerCase());
+                const nomeIdx = headers.indexOf('nome');
+                const senhaIdx = headers.indexOf('senha');
+                if (nomeIdx === -1 || senhaIdx === -1) return { ok: false };
+                const nomeN = norm(nome);
+                const senhaN = norm(senha);
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = lines[i].split(sep).map(c => c.trim());
+                    if (norm(cols[nomeIdx]) === nomeN && norm(cols[senhaIdx]) === senhaN) {
+                        return { ok: true, user: { nome: cols[nomeIdx] } };
+                    }
+                }
+                return { ok: false };
+            } catch { return { ok: false }; }
+        }
+
+        function setLoading(btn, loading) {
+            if (!btn) return;
+            if (loading) {
+                btn.dataset.prev = btn.innerHTML;
+                btn.innerHTML = '<span>Entrando...</span>';
+                btn.style.opacity = '0.7';
+                btn.disabled = true;
+            } else {
+                btn.innerHTML = btn.dataset.prev || '<span>Entrar</span>';
+                btn.style.opacity = '1';
+                btn.disabled = false;
+            }
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('loginError');
+            if (!el) return;
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        function clearError() {
+            const el = document.getElementById('loginError');
+            if (!el) return;
+            el.textContent = '';
+            el.style.display = 'none';
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            clearError();
+
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const btn = document.querySelector('.btn-login');
+            
+            if (!username || !password) {
+                showError('Por favor, preencha usuário e senha.');
+                return;
+            }
+
+            setLoading(btn, true);
+
+            // 1) Tenta endpoint dedicado /login (POST)
+            let auth = await tryPostLogin(username, password);
+            if (!auth.ok) {
+                // 2) Fallback: buscar na tabela usuarios
+                auth = await tryGetUsuarios(username, password);
+            }
+            if (!auth.ok) {
+                // 3) Fallback: arquivo local usuarios.csv (desenvolvimento)
+                auth = await tryCsvUsuarios(username, password);
+            }
+
+            if (auth.ok) {
+                // Persistir sessão simples
+                localStorage.setItem('auth_user', JSON.stringify({ nome: username, at: Date.now() }));
+                window.location.href = 'ninebox.html';
+            } else {
+                showError('Usuário ou senha inválidos.');
+                setLoading(btn, false);
+            }
+        });
+
+        // Adiciona efeito de foco nos inputs
+        document.querySelectorAll('.input-wrapper input').forEach(input => {
+            input.addEventListener('focus', function() {
+                this.parentElement.classList.add('focused');
+            });
+            input.addEventListener('blur', function() {
+                this.parentElement.classList.remove('focused');
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <defs>
+    <style>
+      .logo-text { fill: #ffffff; font-family: Arial, sans-serif; font-weight: 300; }
+      .logo-border { fill: none; stroke: #ffffff; stroke-width: 1.5; }
+    </style>
+  </defs>
+  
+  <!-- Bordas -->
+  <line x1="5" y1="10" x2="195" y2="10" class="logo-border"/>
+  <line x1="5" y1="10" x2="5" y2="50" class="logo-border"/>
+  <line x1="5" y1="50" x2="195" y2="50" class="logo-border"/>
+  
+  <!-- Texto REFRAMAX -->
+  <text x="15" y="38" class="logo-text" font-size="24">REFRAMAX</text>
+  
+  <!-- Símbolo A estilizado -->
+  <line x1="105" y1="10" x2="95" y2="35" class="logo-border"/>
+  <line x1="105" y1="50" x2="95" y2="25" class="logo-border"/>
+  <line x1="95" y1="30" x2="110" y2="30" class="logo-border"/>
+</svg>

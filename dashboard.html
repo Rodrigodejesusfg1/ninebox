@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - NineBox</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-logo">
+                <img src="REFRAMAX_.jpeg" alt="Reframax Logo">
+                <div class="header-title">
+                    <h1>Nine Box Matrix</h1>
+                    <p class="subtitle">Dashboard</p>
+                </div>
+            </div>
+            <nav class="header-nav">
+                <a href="ninebox.html" class="nav-link">Nine Box</a>
+                <a href="config.html" class="nav-link">Configurações</a>
+                <a href="dashboard.html" class="nav-link active">Dashboard</a>
+                <a href="index.html" class="nav-link logout" onclick="try{localStorage.removeItem('auth_user')}catch(e){}">Sair</a>
+            </nav>
+        </header>
+
+        <div class="content">
+            <h2 style="color: #1a2332; margin-bottom: 20px;">Estatísticas Gerais</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total de Avaliações</div>
+                    <div class="stat-value" id="total-count">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Média Desempenho</div>
+                    <div class="stat-value" id="avg-performance">0.0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Média Potencial</div>
+                    <div class="stat-value" id="avg-potential">0.0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Áreas Distintas</div>
+                    <div class="stat-value" id="area-count">0</div>
+                </div>
+            </div>
+
+            <div id="detailedStats"></div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
