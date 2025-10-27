@@ -1,4 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
@@ -74,9 +76,43 @@ def validate_user_credentials(nome: str, senha: str) -> bool:
         logger.error(f"Erro ao validar credenciais: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao validar credenciais: {str(e)}")
 
+# ===== Servir arquivos estáticos =====
+# Montar diretório de arquivos estáticos (CSS, JS, imagens)
+app.mount("/styles", StaticFiles(directory="styles"), name="styles")
+app.mount("/image", StaticFiles(directory="image"), name="image")
+
+# Rota raiz serve o index.html (página de login)
 @app.get("/")
-async def root():
-    """Endpoint raiz para verificar se a API está funcionando"""
+async def serve_root():
+    """Servir a página inicial (login)"""
+    return FileResponse("index.html")
+
+# Rotas para páginas HTML
+@app.get("/ninebox.html")
+async def serve_ninebox():
+    return FileResponse("ninebox.html")
+
+@app.get("/config.html")
+async def serve_config():
+    return FileResponse("config.html")
+
+@app.get("/dashboard.html")
+async def serve_dashboard():
+    return FileResponse("dashboard.html")
+
+# Servir arquivos JavaScript
+@app.get("/app.js")
+async def serve_app_js():
+    return FileResponse("app.js")
+
+@app.get("/config.js")
+async def serve_config_js():
+    return FileResponse("config.js")
+
+# ===== Endpoints da API =====
+@app.get("/api")
+async def api_root():
+    """Endpoint raiz da API"""
     return {
         "message": "NineBox API está funcionando!",
         "status": "online",
