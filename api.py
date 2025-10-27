@@ -77,9 +77,9 @@ def validate_user_credentials(nome: str, senha: str) -> bool:
         raise HTTPException(status_code=500, detail=f"Erro ao validar credenciais: {str(e)}")
 
 # ===== Servir arquivos estáticos =====
-# Montar diretório de arquivos estáticos (CSS, JS, imagens)
-app.mount("/styles", StaticFiles(directory="styles"), name="styles")
-app.mount("/image", StaticFiles(directory="image"), name="image")
+# Montar diretório de imagens se existir
+if os.path.exists("image"):
+    app.mount("/image", StaticFiles(directory="image"), name="image")
 
 # Rota raiz serve o index.html (página de login)
 @app.get("/")
@@ -108,6 +108,24 @@ async def serve_app_js():
 @app.get("/config.js")
 async def serve_config_js():
     return FileResponse("config.js")
+
+# Servir arquivos CSS
+@app.get("/styles.css")
+async def serve_styles_css():
+    return FileResponse("styles.css")
+
+@app.get("/login.css")
+async def serve_login_css():
+    return FileResponse("login.css")
+
+# Servir arquivos de imagem/logo na raiz
+@app.get("/logo-reframax.svg")
+async def serve_logo_svg():
+    return FileResponse("logo-reframax.svg")
+
+@app.get("/REFRAMAX_.jpeg")
+async def serve_logo_jpeg():
+    return FileResponse("REFRAMAX_.jpeg")
 
 # ===== Endpoints da API =====
 @app.get("/api")
