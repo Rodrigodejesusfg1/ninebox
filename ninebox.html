@@ -80,6 +80,12 @@
                             <option value="">Todas</option>
                         </select>
                     </div>
+                    <div>
+                        <label>Gestor:</label>
+                        <select id="filterGestor">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="btn-group">
                     <button class="btn btn-primary" onclick="applyFilters()">Filtrar</button>
@@ -173,9 +179,9 @@
             </div>
 
             <!-- Modal para detalhes -->
-            <div id="modal" class="modal">
-                <div class="modal-content">
-                    <span class="modal-close" onclick="closeModal()">&times;</span>
+            <div id="modal" class="modal" role="dialog" aria-modal="true" aria-label="Detalhes do colaborador">
+                <div class="modal-content" tabindex="-1">
+                    <button class="modal-close" onclick="closeModal()" aria-label="Fechar">&times;</button>
                     <div id="modalContent"></div>
                 </div>
             </div>

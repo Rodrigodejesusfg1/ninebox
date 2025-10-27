@@ -3,18 +3,57 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
 from typing import List, Dict, Any
 import logging
+import ssl
+import warnings
+import traceback
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Carregar variáveis de ambiente
+# Carregar variáveis de ambiente ANTES de qualquer coisa
 load_dotenv()
+
+# Detectar ambiente (local vs produção)
+is_local_env = os.getenv("RENDER") is None  # Render define essa variável em produção
+
+# ===== SOLUÇÃO PARA PROXY CORPORATIVO EM AMBIENTE LOCAL =====
+if is_local_env:
+    logger.warning("⚠️ Ambiente LOCAL detectado - Aplicando patch SSL para proxy corporativo")
+    
+    # Importar httpcore ANTES de supabase
+    import httpcore._backends.sync
+    
+    # Salvar função original
+    _original_start_tls = httpcore._backends.sync.SyncStream.start_tls
+    
+    # Criar função patcheada que não verifica SSL
+    def _patched_start_tls(self, *args, **kwargs):
+        # Forçar SSL context sem verificação (apenas em ambiente local!)
+        kwargs['ssl_context'] = ssl._create_unverified_context()
+        return _original_start_tls(self, *args, **kwargs)
+    
+    # Aplicar o patch
+    httpcore._backends.sync.SyncStream.start_tls = _patched_start_tls
+    
+    # Suprimir warnings de SSL
+    warnings.filterwarnings('ignore', message='Unverified HTTPS request')
+    try:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    except:
+        pass
+    
+    logger.info("✅ Patch SSL aplicado com sucesso (ambiente local)")
+else:
+    logger.info("🚀 Ambiente de PRODUÇÃO detectado - SSL verificação ativada")
+
+# Agora importar supabase (após patch se necessário)
+from supabase import create_client, Client
 
 # Inicializar FastAPI
 app = FastAPI(title="NineBox API", version="1.0.0")
@@ -39,9 +78,14 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 try:
     # Criar cliente Supabase
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    logger.info("Cliente Supabase inicializado com sucesso")
+    
+    if is_local_env:
+        logger.info("✅ Cliente Supabase inicializado (LOCAL - SSL bypass ativado)")
+    else:
+        logger.info("✅ Cliente Supabase inicializado (PRODUÇÃO - SSL verificado)")
+        
 except Exception as e:
-    logger.error(f"Erro ao inicializar Supabase: {e}")
+    logger.error(f"❌ Erro ao inicializar Supabase: {e}")
     supabase = None
 
 
@@ -407,6 +451,193 @@ async def get_mesa_calibracao(limit: int = Query(1000, ge=1, le=10000), offset: 
     except Exception as e:
         logger.error(f"Erro ao buscar mesa de calibração: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao buscar mesa de calibração: {str(e)}")
+
+@app.get("/api/desenvolvimento/{nome}")
+async def get_desenvolvimento_por_nome(nome: str):
+    """
+    Buscar dados de desenvolvimento para um colaborador pelo nome.
+    Retorna o registro mais recente se houver mais de um.
+    """
+    try:
+        validate_supabase()
+        # Primeiro por nome do colaborador
+        resp = (
+            supabase
+            .table("desenvolvimento_colaborador")
+            .select("*")
+            .eq("colaborador", nome)
+            .order("atualizado_em", desc=True)
+            .limit(1)
+            .execute()
+        )
+        data = resp.data or []
+
+        if not data:
+            # Tentar localizar por CPF, se conseguirmos inferir do nome via relacao_ativos
+            try:
+                emp = (
+                    supabase
+                    .table("relacao_ativos")
+                    .select("cpf, nome")
+                    .ilike("nome", nome)
+                    .limit(1)
+                    .execute()
+                )
+                if emp.data and emp.data[0].get("cpf"):
+                    cpf = str(emp.data[0]["cpf"]) or ""
+                    if cpf:
+                        resp2 = (
+                            supabase
+                            .table("desenvolvimento_colaborador")
+                            .select("*")
+                            .eq("cpf", cpf)
+                            .order("atualizado_em", desc=True)
+                            .limit(1)
+                            .execute()
+                        )
+                        data = resp2.data or []
+            except Exception:
+                pass
+
+        if data:
+            return {"found": True, "data": data[0]}
+        return {"found": False, "data": None}
+    except Exception as e:
+        logger.error(f"Erro ao buscar desenvolvimento: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar desenvolvimento: {str(e)}")
+
+class DesenvolvimentoPayload(BaseModel):
+    colaborador: str
+    cpf: str | None = None
+    # Sucessores e prontidões
+    sucessao_pessoa1: str | None = None
+    prontidao_pessoa1: str | None = None
+    prontidao_pessoa1_outros: str | None = None
+    indicador_pessoa1: str | None = None
+    sucessao_pessoa2: str | None = None
+    prontidao_pessoa2: str | None = None
+    prontidao_pessoa2_outros: str | None = None
+    indicador_pessoa2: str | None = None
+    sucessao_pessoa3: str | None = None
+    prontidao_pessoa3: str | None = None
+    prontidao_pessoa3_outros: str | None = None
+    indicador_pessoa3: str | None = None
+    # Demais campos
+    aptidao_carreira: str | None = None
+    risco_saida: str | None = None
+    impacto_saida: str | None = None
+    pessoa_chave_tecnica: str | None = None
+    comentarios: str | None = None
+    criado_por: str | None = None
+    atualizado_por: str | None = None
+
+@app.post("/api/desenvolvimento")
+async def upsert_desenvolvimento(payload: DesenvolvimentoPayload):
+    """
+    Insere ou atualiza o desenvolvimento do colaborador.
+    Critério: se existir registro para 'colaborador' (ou 'cpf' quando fornecido), faz update; senão, insert.
+    """
+    try:
+        validate_supabase()
+
+        # Sanitizar valores vazios para None, para evitar conflitos com CHECKs
+        data = {k: (v if (v is not None and str(v).strip() != "") else None) for k, v in payload.dict().items()}
+
+        # Ajustar campos de prontidão dos sucessores: se 'Outros', gravar NULL e usar campo *_outros
+        for key in ("prontidao_pessoa1", "prontidao_pessoa2", "prontidao_pessoa3"):
+            if data.get(key) and str(data[key]).strip().lower() == "outros":
+                data[key] = None
+
+        # Tentar localizar registro existente por colaborador
+        existing = (
+            supabase
+            .table("desenvolvimento_colaborador")
+            .select("id")
+            .eq("colaborador", data.get("colaborador"))
+            .limit(1)
+            .execute()
+        )
+        row = (existing.data or [None])[0]
+
+        # Se não encontrou e houver CPF, procurar por CPF
+        if not row and data.get("cpf"):
+            existing2 = (
+                supabase
+                .table("desenvolvimento_colaborador")
+                .select("id")
+                .eq("cpf", str(data.get("cpf")))
+                .limit(1)
+                .execute()
+            )
+            row = (existing2.data or [None])[0]
+
+        if row and row.get("id"):
+            # Update
+            data["atualizado_em"] = None  # deixar o default/trigger do banco cuidar
+            resp = (
+                supabase
+                .table("desenvolvimento_colaborador")
+                .update(data)
+                .eq("id", row["id"])
+                .execute()
+            )
+            return {"success": True, "action": "updated", "data": resp.data}
+        else:
+            # Insert
+            resp = (
+                supabase
+                .table("desenvolvimento_colaborador")
+                .insert(data)
+                .execute()
+            )
+            return {"success": True, "action": "inserted", "data": resp.data}
+    except Exception as e:
+        logger.error(f"Erro ao salvar desenvolvimento: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar desenvolvimento: {str(e)}")
+
+@app.get("/api/pessoas-avaliadas")
+async def get_pessoas_avaliadas(
+    gestor: str | None = Query(None, description="Filtro por gestor"),
+    limit: int = Query(1000, ge=1, le=10000), 
+    offset: int = Query(0, ge=0)
+):
+    """
+    Obter pessoas avaliadas e seus gestores
+    Campos: NOME (nome do candidato), GESTOR (responsável pela pessoa)
+    """
+    try:
+        logger.info("Buscando pessoas avaliadas no Supabase...")
+        start = offset
+        end = offset + limit - 1
+        
+        # Construir query - nome da tabela com underscore
+        query = supabase.table("pessoas_avaliadas").select("*")
+        
+        # Aplicar filtro de gestor se fornecido - campo GESTOR em maiúscula
+        if gestor:
+            query = query.eq("GESTOR", gestor)
+            logger.info(f"Filtrando por gestor: {gestor}")
+        
+        # Aplicar paginação
+        response = query.range(start, end).execute()
+        
+        if not response.data:
+            logger.warning("Nenhuma pessoa avaliada encontrada")
+            return {"data": [], "count": 0}
+        
+        logger.info(f"Pessoas avaliadas nesta página: {len(response.data)} (offset={offset}, limit={limit})")
+        if len(response.data) > 0:
+            logger.info(f"Exemplo de registro: {response.data[0]}")
+            logger.info(f"Chaves disponíveis: {list(response.data[0].keys())}")
+        
+        return {
+            "data": response.data,
+            "count": len(response.data)
+        }
+    except Exception as e:
+        logger.error(f"Erro ao buscar pessoas avaliadas: {str(e)}")
+        logger.error(f"Stack trace: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar pessoas avaliadas: {str(e)}")
 
 @app.get("/api/filtros")
 async def get_filtros():

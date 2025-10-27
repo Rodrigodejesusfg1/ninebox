@@ -8,6 +8,7 @@ let notasAVD2024 = []; // Notas de 2024 para comparação
 let desenvolvimentoData = {}; // Dados de desenvolvimento por colaborador (cache)
 let manualOverrides = {}; // Armazena mudanças manuais de quadrante: { nomeCompleto: 'posição' }
 let mesaCalibracaoData = []; // Dados da mesa de calibração
+let pessoasAvaliadasData = []; // Dados de pessoas avaliadas (nome e gestor)
 const STORAGE_KEY = 'ninebox_manual_overrides';
 let compactView = false; // Estado de visão compacta
 let spinnerKeyframesInjected = false; // Fallback para animação do spinner
@@ -295,6 +296,32 @@ async function loadDataFromSupabase() {
             }
         } catch (e) {
             console.warn('Falha ao carregar mesa de calibração:', e.message);
+        }
+
+        // Carregar pessoas avaliadas
+    console.log('👤 Carregando pessoas avaliadas...');
+    updateLoader('Carregando pessoas avaliadas...');
+        try {
+            console.log('📡 Iniciando requisição para:', `${API_BASE_URL}/pessoas-avaliadas`);
+            pessoasAvaliadasData = await fetchAllPaged(`${API_BASE_URL}/pessoas-avaliadas`, 1000, {
+                uniqueKeyCandidates: ['NOME', 'nome']
+            });
+            console.log(`✓ ${pessoasAvaliadasData.length} pessoas avaliadas carregadas`);
+            if (pessoasAvaliadasData.length > 0) {
+                console.log('📋 Exemplo de pessoa avaliada:', pessoasAvaliadasData[0]);
+                console.log('🔑 Chaves disponíveis:', Object.keys(pessoasAvaliadasData[0]));
+            } else {
+                console.warn('⚠️ Array de pessoas avaliadas está vazio!');
+            }
+            // IMPORTANTE: Repopular filtros dependentes (Gestor) após carregar pessoasAvaliadasData
+            try {
+                populateEmployeeFilters();
+            } catch (e) {
+                console.warn('Falha ao repopular filtros de funcionário após pessoas avaliadas:', e?.message || e);
+            }
+        } catch (e) {
+            console.error('❌ Falha ao carregar pessoas avaliadas:', e);
+            console.error('Stack:', e.stack);
         }
         
         // Preencher filtros
@@ -939,6 +966,11 @@ function populateFilters() {
 
 // Preencher filtros de funcionários (DIRETORIA, GERENCIA, GRUPO DE CARGO) - Adaptado para Supabase
 function populateEmployeeFilters() {
+    console.log('🔧 populateEmployeeFilters() chamada');
+    console.log('📊 Dados disponíveis:');
+    console.log('   - employeeData:', employeeData.length, 'registros');
+    console.log('   - pessoasAvaliadasData:', pessoasAvaliadasData.length, 'registros');
+    
     // Schema relacao_ativos: diretoria, gerencia, cargo
     const getVal = (obj, keys) => keys.map(k => obj[k]).find(v => v !== undefined && v !== null && `${v}`.trim() !== '');
     const diretorias = [...new Set(employeeData.map(d => getVal(d, ['diretoria','DIRETORIA'])))]
@@ -981,6 +1013,34 @@ function populateEmployeeFilters() {
             option.textContent = grupo;
             grupoCargoSelect.appendChild(option);
         });
+    }
+
+    // Popular filtro de Gestor
+    const gestorSelect = document.getElementById('filterGestor');
+    if (gestorSelect) {
+        console.log('🔍 Populando filtro de Gestor...');
+        console.log('📦 Total de registros pessoas_avaliadas:', pessoasAvaliadasData.length);
+        
+        if (pessoasAvaliadasData.length > 0) {
+            console.log('📋 Exemplo de registro:', pessoasAvaliadasData[0]);
+            console.log('🔑 Chaves disponíveis:', Object.keys(pessoasAvaliadasData[0]));
+        }
+        
+        const gestores = [...new Set(pessoasAvaliadasData.map(d => getVal(d, ['GESTOR', 'gestor', 'Gestor'])))]
+            .filter(g => g)
+            .sort();
+        
+        console.log('👥 Gestores encontrados:', gestores);
+        
+        gestorSelect.innerHTML = '<option value="">Todos</option>';
+        gestores.forEach(gestor => {
+            const option = document.createElement('option');
+            option.value = gestor;
+            option.textContent = gestor;
+            gestorSelect.appendChild(option);
+        });
+        
+        console.log(`✅ Filtro de Gestor populado com ${gestores.length} opções`);
     }
 }
 
@@ -1257,6 +1317,46 @@ function getMesaByName(nome) {
         diretoria: get(rec, ['DIRETORIA','diretoria','Diretoria']),
         localidade: get(rec, ['Localidade','localidade','LOCALIDADE']),
         calibracao: get(rec, ['Calibração?','Calibracao?','calibração?','calibracao?','Calibração','calibração'])
+    };
+}
+
+// Buscar dados de gestor por nome do colaborador
+function getGestorByName(nome) {
+    if (!nome || pessoasAvaliadasData.length === 0) return null;
+
+    const norm = s => (s || '').toString().trim().toUpperCase();
+    const target = norm(nome);
+
+    // Buscar por correspondência exata
+    let rec = pessoasAvaliadasData.find(r => {
+        const nomeCampo = r.NOME || r.nome || r.Nome || r['Usuário Avaliado'] || r['USUÁRIO AVALIADO'] || '';
+        return norm(nomeCampo) === target;
+    });
+    
+    // Se não encontrar, tentar correspondência parcial
+    if (!rec) {
+        rec = pessoasAvaliadasData.find(r => {
+            const nomeCampo = r.NOME || r.nome || r.Nome || r['Usuário Avaliado'] || r['USUÁRIO AVALIADO'] || '';
+            const nomeNorm = norm(nomeCampo);
+            return nomeNorm.includes(target) || target.includes(nomeNorm);
+        });
+    }
+    
+    if (!rec) return null;
+
+    // Normalizar campos potenciais
+    const get = (obj, keys) => {
+        for (const k of keys) {
+            if (obj[k] !== undefined && obj[k] !== null) {
+                return obj[k];
+            }
+        }
+        return '';
+    };
+
+    return {
+        nome: get(rec, ['NOME','nome','Nome','Usuário Avaliado','USUÁRIO AVALIADO']),
+        gestor: get(rec, ['GESTOR','gestor','Gestor'])
     };
 }
 
@@ -1685,6 +1785,7 @@ function applyFilters() {
     const gerenciaFilter = document.getElementById('filterGerencia')?.value || '';
     const grupoCargoFilter = document.getElementById('filterGrupoCargo')?.value || '';
     const mesaFilter = document.getElementById('filterMesa')?.value || '';
+    const gestorFilter = document.getElementById('filterGestor')?.value || '';
     
     filteredData = allData.filter(person => {
         const matchArea = !areaFilter || person['Área'] === areaFilter;
@@ -1718,7 +1819,19 @@ function applyFilters() {
             matchMesa = mesa ? `${mesa.mesa}` === `${mesaFilter}` : false;
         }
 
-        return matchArea && matchForm && matchName && matchDiretoria && matchGerencia && matchGrupoCargo && matchMesa;
+        // Filtro por gestor
+        let matchGestor = true;
+        if (gestorFilter) {
+            const pessoaAvaliada = getGestorByName(person['Usuário Avaliado'] || person['Avaliado']);
+            if (pessoaAvaliada && pessoaAvaliada.gestor) {
+                const norm = (s)=> (s||'').toString().trim().toUpperCase();
+                matchGestor = norm(pessoaAvaliada.gestor) === norm(gestorFilter);
+            } else {
+                matchGestor = false;
+            }
+        }
+
+        return matchArea && matchForm && matchName && matchDiretoria && matchGerencia && matchGrupoCargo && matchMesa && matchGestor;
     });
     
     console.log(`${filteredData.length} registros após filtros`);
@@ -1741,6 +1854,12 @@ function clearFilters() {
     }
     if (document.getElementById('filterGrupoCargo')) {
         document.getElementById('filterGrupoCargo').value = '';
+    }
+    if (document.getElementById('filterMesa')) {
+        document.getElementById('filterMesa').value = '';
+    }
+    if (document.getElementById('filterGestor')) {
+        document.getElementById('filterGestor').value = '';
     }
     
     filteredData = [...allData];
@@ -1913,7 +2032,7 @@ function showBoxDetail(row, col) {
     html += '</div>';
     
     document.getElementById('modalContent').innerHTML = html;
-    document.getElementById('modal').classList.add('active');
+    openModal();
 }
 
 // Mostrar detalhes de uma pessoa
@@ -2172,7 +2291,7 @@ async function showPersonDetail(person) {
         </div>`; // Fecha detail-grid + shell
     
     document.getElementById('modalContent').innerHTML = html;
-    document.getElementById('modal').classList.add('active');
+    openModal();
 }
 
 // Gerar card de comparação de avaliações
@@ -2622,9 +2741,57 @@ function generateMovementTimeline(movements) {
     return html;
 }
 
+// Acessibilidade do modal: abertura com foco, trap de foco e fechar com ESC
+let __lastFocusedEl = null;
+let __modalKeydownHandler = null;
+
+function openModal() {
+    const modal = document.getElementById('modal');
+    const content = modal?.querySelector('.modal-content');
+    if (!modal || !content) return;
+
+    __lastFocusedEl = document.activeElement;
+    modal.classList.add('active');
+
+    // Focus no conteúdo do modal (ou botão fechar)
+    const focusable = content.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    const first = focusable[0] || content;
+    const last = focusable[focusable.length - 1] || content;
+    first.focus();
+
+    // Trap de foco e ESC para fechar
+    __modalKeydownHandler = function(e) {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            closeModal();
+            return;
+        }
+        if (e.key === 'Tab' && focusable.length > 0) {
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        }
+    };
+    content.addEventListener('keydown', __modalKeydownHandler);
+}
+
 // Fechar modal
 function closeModal() {
-    document.getElementById('modal').classList.remove('active');
+    const modal = document.getElementById('modal');
+    const content = modal?.querySelector('.modal-content');
+    if (content && __modalKeydownHandler) {
+        content.removeEventListener('keydown', __modalKeydownHandler);
+    }
+    __modalKeydownHandler = null;
+    modal.classList.remove('active');
+    if (__lastFocusedEl && typeof __lastFocusedEl.focus === 'function') {
+        try { __lastFocusedEl.focus(); } catch {}
+    }
+    __lastFocusedEl = null;
 }
 
 // Salvar dados de desenvolvimento

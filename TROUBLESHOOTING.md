@@ -179,3 +179,97 @@ Antes de fazer deploy, confirme:
 ---
 
 **Última atualização**: As correções foram aplicadas. Faça push e o Render deverá fazer o build com sucesso! 🚀
+
+---
+
+## Acessibilidade do Modal de Colaborador
+
+- Pressione Esc para fechar o modal rapidamente.
+- O foco do teclado é preso dentro do modal enquanto ele estiver aberto (Tab/Shift+Tab circula entre os campos do modal).
+- O botão Fechar no canto superior direito é focável e tem indicação de foco visível.
+- Clique fora do conteúdo do modal para fechá-lo também.
+
+Se o modal não fechar com Esc, verifique no console se há erros de JavaScript no arquivo `app.js` relacionados a eventos de teclado.
+
+---
+
+## 🏠 Rodando a API Localmente com Proxy Corporativo
+
+### Problema: SSL Certificate Error em Ambiente Local
+
+**Sintoma**: Ao rodar `python api.py` localmente, a API falha ao conectar com Supabase:
+```
+SSL: CERTIFICATE_VERIFY_FAILED - self-signed certificate in certificate chain
+```
+
+**Causa**: Proxy corporativo (Zscaler, Fortinet, etc.) intercepta conexões HTTPS e injeta certificados próprios.
+
+### ✅ Solução Implementada
+
+A API agora **detecta automaticamente** se está rodando localmente ou em produção:
+
+- **Local** (sem variável `RENDER`): Desabilita verificação SSL automaticamente
+- **Produção** (Render): Usa SSL verificado normalmente
+
+#### Como Usar
+
+1. **Testar conexão primeiro** (opcional):
+   ```powershell
+   python test_supabase_local.py
+   ```
+
+2. **Iniciar a API**:
+   ```powershell
+   python api.py
+   ```
+   
+   Ou use o batch:
+   ```powershell
+   .\start_server.bat
+   ```
+
+3. **Verificar logs**:
+   ```
+   WARNING:__main__:⚠️ Ambiente LOCAL detectado - Aplicando patch SSL
+   INFO:__main__:✅ Patch SSL aplicado com sucesso (ambiente local)
+   INFO:__main__:✅ Cliente Supabase inicializado (LOCAL - SSL bypass ativado)
+   INFO:     Uvicorn running on http://0.0.0.0:8000
+   ```
+
+#### Testar Endpoints
+
+```powershell
+# Health check
+curl http://localhost:8000/api/health
+
+# Listar avaliações
+curl http://localhost:8000/api/avaliacoes?limit=5
+
+# Acessar frontend
+# Abra no navegador: http://localhost:8000/
+```
+
+### Detalhes Técnicos
+
+A API usa um "monkey patch" no módulo `httpcore` para desabilitar verificação SSL **apenas em ambiente local**:
+
+```python
+import httpcore._backends.sync
+
+# Patch aplicado automaticamente quando RENDER não está definido
+def _patched_start_tls(self, *args, **kwargs):
+    kwargs['ssl_context'] = ssl._create_unverified_context()
+    return _original_start_tls(self, *args, **kwargs)
+```
+
+### Segurança
+
+- ⚠️ **Bypass SSL só acontece em ambiente local** (desenvolvimento)
+- ✅ **Produção usa SSL verificado** e seguro
+- 🔐 A detecção de ambiente é automática via variável `RENDER`
+
+### Documentação Completa
+
+Veja `LOCAL_SETUP.md` para instruções detalhadas de setup local.
+
+---
