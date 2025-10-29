@@ -1632,7 +1632,8 @@ function getGestorByName(nome) {
 function normalizeScore(score, maxScore) {
     if (!score || score === 'N/A' || isNaN(parseFloat(score))) return null;
     const numScore = parseFloat(score);
-    return (numScore / maxScore) * 10;
+    // Normalizar para escala de 0-4
+    return (numScore / maxScore) * 4;
 }
 
 // Buscar nota de 2024 do funcionário
@@ -1691,11 +1692,11 @@ function getPerformanceComparison(nome, nota2025) {
         return null;
     }
     
-    // Normalizar nota 2025 (0-4) para 0-10
-    const nota2025Normalizada = normalizeScore(nota2025, 4);
+    // Nota 2025 já está na escala 0-4, não precisa normalizar
+    const nota2025Normalizada = parseFloat(nota2025);
     
     if (!nota2025Normalizada) {
-        console.log('❌ Erro ao normalizar nota 2025');
+        console.log('❌ Erro ao processar nota 2025');
         return null;
     }
     
