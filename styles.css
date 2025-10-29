@@ -862,6 +862,13 @@ select:focus, input[type="text"]:focus {
     border-color: var(--accent-color);
 }
 
+/* Chip de sucesso (Calibrado) */
+.chip--success {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border-color: #c8e6c9;
+}
+
 .detail-grid {
     display: grid;
     grid-template-columns: 1fr 1fr; /* duas colunas equilibradas */
@@ -1025,6 +1032,31 @@ select:focus, input[type="text"]:focus {
 .badge-warning {
     background: #fff3e0;
     color: #ef6c00;
+}
+
+/* Selo Calibrado (cartão e lista) */
+.badge-calibrado {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+    font-weight: 700;
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Versão mínima para a visão compacta: apenas um ponto verde */
+.badge-calibrado--tiny {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #2e7d32;
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 6px;
 }
 
 /* ===== Cartão de Desenvolvimento minimizado e moderno ===== */
@@ -1527,4 +1559,253 @@ select:focus, input[type="text"]:focus {
 .loader-message {
     font-size: 0.95em;
     color: #1a2332;
+}
+
+/* Estilos para células de nota com tooltips elegantes */
+.nota-cell {
+    text-align: center;
+    color: #003797;
+    font-weight: 600;
+    cursor: help;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #e3f2fd;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.nota-cell:hover {
+    background: #003797;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 55, 151, 0.3);
+}
+
+.nota-cell::after {
+    content: attr(title);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) scale(0.9);
+    opacity: 0;
+    pointer-events: none;
+    background: #1a2332;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.85em;
+    font-weight: 400;
+    white-space: pre-wrap;
+    max-width: 300px;
+    text-align: left;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    transition: all 0.2s ease;
+}
+
+.nota-cell::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%) scale(0.9);
+    opacity: 0;
+    pointer-events: none;
+    border: 6px solid transparent;
+    border-top-color: #1a2332;
+    z-index: 1001;
+    transition: all 0.2s ease;
+}
+
+.nota-cell:hover::after,
+.nota-cell:hover::before {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+}
+
+/* Melhorias para cards de experiências profissionais */
+.experience-card {
+    background: #f8f9fa;
+    border-left: 4px solid #003797;
+    padding: 16px;
+    margin-bottom: 16px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.experience-card:hover {
+    background: #e3f2fd;
+    box-shadow: 0 4px 12px rgba(0, 55, 151, 0.15);
+    transform: translateX(4px);
+}
+
+.experience-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 12px;
+}
+
+.experience-title {
+    font-weight: 700;
+    color: #003797;
+    font-size: 1.05em;
+    margin-bottom: 4px;
+}
+
+.experience-duration {
+    background: #003797;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.experience-meta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+    font-size: 0.9em;
+    color: #546e7a;
+}
+
+.experience-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.experience-meta-item strong {
+    color: #1a2332;
+}
+
+.experience-description {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed #cfd8dc;
+    color: #1a2332;
+    line-height: 1.6;
+    font-size: 0.95em;
+}
+
+/* Melhorias para card de idiomas */
+.language-item {
+    background: linear-gradient(135deg, #e3f2fd 0%, #f5f8fa 100%);
+    border: 1px solid #bbdefb;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+}
+
+.language-item:hover {
+    border-color: #003797;
+    box-shadow: 0 4px 12px rgba(0, 55, 151, 0.2);
+    transform: translateY(-2px);
+}
+
+.language-name {
+    font-weight: 700;
+    color: #003797;
+    font-size: 1em;
+    margin-bottom: 6px;
+}
+
+.language-level {
+    display: inline-block;
+    background: #003797;
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.language-obs {
+    color: #546e7a;
+    font-size: 0.9em;
+    margin-top: 4px;
+}
+
+/* Ícone de ajuda com tooltip elegante */
+.help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-left: 8px;
+    color: #003797;
+    cursor: help;
+    position: relative;
+    vertical-align: middle;
+    transition: all 0.3s ease;
+}
+
+.help-icon:hover {
+    color: #0051c9;
+    transform: scale(1.15);
+}
+
+.help-icon svg {
+    display: block;
+}
+
+.help-icon::after {
+    content: attr(title);
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) scale(0.9);
+    opacity: 0;
+    pointer-events: none;
+    background: linear-gradient(135deg, #1a2332 0%, #2c3e50 100%);
+    color: white;
+    padding: 14px 18px;
+    border-radius: 10px;
+    font-size: 0.85em;
+    font-weight: 400;
+    white-space: pre-line;
+    min-width: 280px;
+    text-align: left;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    line-height: 1.6;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.help-icon::before {
+    content: '';
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%) scale(0.9);
+    opacity: 0;
+    pointer-events: none;
+    border: 8px solid transparent;
+    border-bottom-color: #1a2332;
+    z-index: 1001;
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.help-icon:hover::after,
+.help-icon:hover::before {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+}
+
+/* Formatação especial do conteúdo do tooltip */
+.help-icon[title*="Critérios"]::after {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Linha de separação visual no título do tooltip */
+.help-icon[title*="Critérios"]::after {
+    background: linear-gradient(135deg, #003797 0%, #0051c9 100%);
+    box-shadow: 0 8px 24px rgba(0, 55, 151, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
 }

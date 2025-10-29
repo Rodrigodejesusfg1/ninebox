@@ -264,6 +264,88 @@ async def get_avaliacoes(limit: int = Query(1000, ge=1, le=10000), offset: int =
         logger.error(f"Erro ao buscar avaliações: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao buscar avaliações: {str(e)}")
 
+class CalibracaoPayload(BaseModel):
+    nota_calibrada_desempenho: float | None = None
+    nota_calibrada_potencial: float | None = None
+    comentarios: str | None = None
+
+def _classificacao_por_nota(nota: float | None) -> str | None:
+    """Mapeia a nota para classificação segundo as faixas solicitadas.
+    - 0 a 2,49 => 'Atende parcialmente'
+    - 2,5 a 3,29 => 'Atende dentro da expectativa'
+    - 3,3 a 4 => 'Supera a expectativa'
+    Retorna None se nota inválida.
+    """
+    try:
+        if nota is None:
+            return None
+        # Garantir intervalo válido
+        n = float(nota)
+        if n < 0:
+            n = 0.0
+        if n <= 2.49:
+            return 'Atende parcialmente'
+        if n <= 3.29:
+            return 'Atende dentro da expectativa'
+        return 'Supera a expectativa'
+    except Exception:
+        return None
+
+@app.patch("/api/avaliacoes/{avaliacao_id}/calibracao")
+async def patch_calibracao(avaliacao_id: int, payload: CalibracaoPayload):
+    """Atualiza notas calibradas de desempenho e/ou potencial na tabela nota_final_colaborador.
+    Também grava as classificações calibradas correspondentes.
+    """
+    try:
+        validate_supabase()
+
+        # Buscar existência do registro
+        existing = (
+            supabase
+            .table("nota_final_colaborador")
+            .select("id")
+            .eq("id", avaliacao_id)
+            .limit(1)
+            .execute()
+        )
+        if not existing.data:
+            raise HTTPException(status_code=404, detail="Avaliação não encontrada")
+
+        # Validar justificativa obrigatória
+        comentarios = (payload.comentarios or "").strip()
+        if not comentarios:
+            raise HTTPException(status_code=400, detail="Campo 'comentarios' é obrigatório para salvar a calibração.")
+
+        # Preparar dados para update (colunas são do tipo text para notas calibradas nesta base)
+        d: Dict[str, Any] = {}
+        if payload.nota_calibrada_desempenho is not None:
+            # Armazenar com 2 casas decimais como texto
+            d["nota_calibrada_desempenho"] = f"{float(payload.nota_calibrada_desempenho):.2f}"
+            d["classificação_calibrada_desempenho"] = _classificacao_por_nota(payload.nota_calibrada_desempenho)
+        if payload.nota_calibrada_potencial is not None:
+            d["nota_calibrada_potencial"] = f"{float(payload.nota_calibrada_potencial):.2f}"
+            d["classificação_calibrada_potencial"] = _classificacao_por_nota(payload.nota_calibrada_potencial)
+
+        # Sempre incluir comentários (obrigatório)
+        d["comentarios"] = comentarios
+
+        if not d.get("nota_calibrada_desempenho") and not d.get("nota_calibrada_potencial"):
+            return {"success": False, "reason": "no-fields"}
+
+        resp = (
+            supabase
+            .table("nota_final_colaborador")
+            .update(d)
+            .eq("id", avaliacao_id)
+            .execute()
+        )
+        return {"success": True, "data": resp.data}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao atualizar calibração: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao atualizar calibração: {str(e)}")
+
 @app.get("/api/funcionarios")
 async def get_funcionarios(limit: int = Query(1000, ge=1, le=10000), offset: int = Query(0, ge=0)):
     """
@@ -404,6 +486,44 @@ async def get_interesse_mudanca(limit: int = Query(1000, ge=1, le=10000), offset
     except Exception as e:
         logger.error(f"Erro ao buscar interesse de mudança: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao buscar interesse de mudança: {str(e)}")
+
+@app.get("/api/experiencias-profissionais")
+async def get_experiencias_profissionais(limit: int = Query(1000, ge=1, le=10000), offset: int = Query(0, ge=0)):
+    """
+    Obter experiências profissionais (experiencias_profissionais)
+    Campos principais: USER_LOGIN, Nome, Email, Localidade, Data_Inicio, Data_Fim, Area_Conhecimento, Descricao, Meses_Experiencia
+    """
+    try:
+        logger.info("Buscando experiencias_profissionais no Supabase...")
+        start = offset
+        end = offset + limit - 1
+        response = supabase.table("experiencias_profissionais").select("*").range(start, end).execute()
+
+        data = response.data or []
+        logger.info(f"Experiências nesta página: {len(data)} (offset={offset}, limit={limit})")
+        return {"data": data, "count": len(data)}
+    except Exception as e:
+        logger.error(f"Erro ao buscar experiencias_profissionais: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar experiencias_profissionais: {str(e)}")
+
+@app.get("/api/notas-por-competencia")
+async def get_notas_por_competencia(limit: int = Query(1000, ge=1, le=10000), offset: int = Query(0, ge=0)):
+    """
+    Obter notas das avaliações por competência (notas_por_competencia)
+    Campos típicos: Área, Formulário, NOME, Avaliador, Tipo de Avaliador, Competência, Fator de Avaliação, Nota, Comentário
+    """
+    try:
+        logger.info("Buscando notas_por_competencia no Supabase...")
+        start = offset
+        end = offset + limit - 1
+        response = supabase.table("notas_por_competencia").select("*").range(start, end).execute()
+
+        data = response.data or []
+        logger.info(f"Notas por competência nesta página: {len(data)} (offset={offset}, limit={limit})")
+        return {"data": data, "count": len(data)}
+    except Exception as e:
+        logger.error(f"Erro ao buscar notas_por_competencia: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar notas_por_competencia: {str(e)}")
 
 @app.get("/api/nota-avd-2024")
 async def get_nota_avd_2024(limit: int = Query(1000, ge=1, le=10000), offset: int = Query(0, ge=0)):

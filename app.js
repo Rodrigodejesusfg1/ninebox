@@ -1,3 +1,50 @@
+// Buscar idiomas por pessoa: tenta por login (preferencial) e, se não houver, por nome normalizado
+function getIdiomasForPerson(person) {
+    if (!idiomasData || idiomasData.length === 0 || !person) return [];
+    const login = (person['Login do Avaliado'] || '').toString().trim();
+    const nome = (person['Usuário Avaliado'] || person['Avaliado'] || '').toString().trim();
+    const nomeNorm = normalizeText(nome);
+
+    let items = [];
+    if (login) {
+        const loginUpper = login.toUpperCase();
+        items = idiomasData.filter(r => {
+            const u = (r.USER_LOGIN || r.user_login || '').toString().trim().toUpperCase();
+            return u && u === loginUpper;
+        });
+    }
+    // Fallback por nome
+    if ((!items || items.length === 0) && nomeNorm) {
+        items = idiomasData.filter(r => normalizeText(r.Nome || r.NOME || r.nome || '') === nomeNorm);
+    }
+
+    // Ordenar por idioma
+    items.sort((a,b) => ('' + (a.Nome_Idioma || a.nome_idioma || '')).localeCompare(('' + (b.Nome_Idioma || b.nome_idioma || '')), 'pt-BR'));
+    return items;
+}
+
+    // Buscar experiências por pessoa: tenta por login (preferencial) e por nome como fallback
+    function getExperienciasForPerson(person) {
+        if (!experienciasData || experienciasData.length === 0 || !person) return [];
+        const login = (person['Login do Avaliado'] || '').toString().trim();
+        const nome = (person['Usuário Avaliado'] || person['Avaliado'] || '').toString().trim();
+        const nomeNorm = normalizeText(nome);
+
+        let items = [];
+        if (login) {
+            const loginUpper = login.toUpperCase();
+            items = experienciasData.filter(r => {
+                const u = (r.USER_LOGIN || r.user_login || '').toString().trim().toUpperCase();
+                return u && u === loginUpper;
+            });
+        }
+        if ((!items || items.length === 0) && nomeNorm) {
+            items = experienciasData.filter(r => normalizeText(r.Nome || r.NOME || r.nome || '') === nomeNorm);
+        }
+        // Ordenar por duração (Meses_Experiencia) desc como critério simples
+        items.sort((a,b) => (parseInt(b.Meses_Experiencia || b.meses_experiencia || 0, 10) - parseInt(a.Meses_Experiencia || a.meses_experiencia || 0, 10)));
+        return items;
+    }
 /// Estado global da aplicação
 let allData = [];
 let filteredData = [];
@@ -9,6 +56,9 @@ let desenvolvimentoData = {}; // Dados de desenvolvimento por colaborador (cache
 let manualOverrides = {}; // Armazena mudanças manuais de quadrante: { nomeCompleto: 'posição' }
 let mesaCalibracaoData = []; // Dados da mesa de calibração
 let pessoasAvaliadasData = []; // Dados de pessoas avaliadas (nome e gestor)
+let idiomasData = []; // Dados de idiomas por colaborador
+let experienciasData = []; // Experiências profissionais por colaborador
+let competenciasData = []; // Notas por competência (auto x gestor)
 const STORAGE_KEY = 'ninebox_manual_overrides';
 let compactView = false; // Estado de visão compacta
 let spinnerKeyframesInjected = false; // Fallback para animação do spinner
@@ -323,6 +373,60 @@ async function loadDataFromSupabase() {
             console.error('❌ Falha ao carregar pessoas avaliadas:', e);
             console.error('Stack:', e.stack);
         }
+
+        // Carregar idiomas
+        console.log('🗣️ Carregando idiomas...');
+        updateLoader('Carregando idiomas...');
+        try {
+            const idiomasResp = await fetch(`${API_BASE_URL}/idiomas`);
+            if (idiomasResp.ok) {
+                const idiomasJson = await idiomasResp.json();
+                idiomasData = Array.isArray(idiomasJson.data) ? idiomasJson.data : [];
+                console.log(`✓ ${idiomasData.length} registros de idiomas carregados`);
+            } else {
+                console.warn('Endpoint idiomas retornou status', idiomasResp.status);
+            }
+        } catch (e) {
+            console.warn('Falha ao carregar idiomas:', e?.message || e);
+        }
+
+        // Carregar experiências profissionais
+        console.log('🧳 Carregando experiências profissionais...');
+        updateLoader('Carregando experiências profissionais...');
+        try {
+            const expResp = await fetch(`${API_BASE_URL}/experiencias-profissionais`);
+            if (expResp.ok) {
+                const expJson = await expResp.json();
+                experienciasData = Array.isArray(expJson.data) ? expJson.data : [];
+                console.log(`✓ ${experienciasData.length} experiências profissionais carregadas`);
+            } else {
+                console.warn('Endpoint experiencias-profissionais retornou status', expResp.status);
+            }
+        } catch (e) {
+            console.warn('Falha ao carregar experiencias-profissionais:', e?.message || e);
+        }
+
+        // Carregar notas por competência (paginado - dataset grande)
+        console.log('🧩 Carregando notas por competência (paginado)...');
+        updateLoader('Carregando notas por competência...');
+        try {
+            const norm = (s) => (s == null ? '' : String(s)).trim().toUpperCase();
+            competenciasData = await fetchAllPaged(`${API_BASE_URL}/notas-por-competencia`, 1000, {
+                // Use uma chave composta para manter todas as competências distintas e evitar colapsar por NOME
+                customKey: (obj) => {
+                    const nome = norm(obj.NOME || obj.Nome || obj.nome || obj.Avaliado || obj['Usuário Avaliado'] || '');
+                    const tipo = norm(obj['Tipo de Avaliador'] || obj.tipo_de_avaliador || '');
+                    const comp = norm(obj.Competência || obj.competência || obj.competencia || obj.Competencia || '');
+                    const fator = norm(obj['Fator de Avaliação'] || obj.fator_de_avaliacao || '');
+                    const aval = norm(obj.Avaliador || obj.avaliador || '');
+                    const nota = String(obj.Nota ?? obj.nota ?? '');
+                    return [nome, tipo, comp, fator, aval, nota].join('|');
+                }
+            });
+            console.log(`✓ ${competenciasData.length} registros de notas por competência carregados (paginado)`);
+        } catch (e) {
+            console.warn('Falha ao carregar notas-por-competencia:', e?.message || e);
+        }
         
         // Preencher filtros
         populateFilters();
@@ -350,7 +454,7 @@ async function loadDataFromSupabase() {
 
 // Helper: busca paginada no endpoint adicionando limit/offset; de-duplica por chaves candidatas
 async function fetchAllPaged(baseUrl, pageSize = 1000, options = {}) {
-    const { uniqueKeyCandidates = [] } = options;
+    const { uniqueKeyCandidates = [], disableDedupe = false, customKey = null } = options;
     let offset = 0;
     let page = 0;
     let all = [];
@@ -358,15 +462,18 @@ async function fetchAllPaged(baseUrl, pageSize = 1000, options = {}) {
 
     // Utilitário para gerar uma chave única razoável para deduplicação
     const makeKey = (obj) => {
-        for (const k of uniqueKeyCandidates) {
-            if (obj && obj[k] !== undefined && obj[k] !== null && `${obj[k]}`.trim() !== '') {
-                return `${k}:${obj[k]}`;
-            }
-        }
-        // Fallback: hash simplista via JSON parcial
         try {
+            if (typeof customKey === 'function') {
+                return customKey(obj);
+            }
+            for (const k of uniqueKeyCandidates) {
+                if (obj && obj[k] !== undefined && obj[k] !== null && `${obj[k]}`.trim() !== '') {
+                    return `${k}:${obj[k]}`;
+                }
+            }
+            // Fallback: hash simplista via JSON parcial (aumentar cobertura para 12 chaves)
             const subset = {};
-            const keys = Object.keys(obj || {}).slice(0, 5);
+            const keys = Object.keys(obj || {}).slice(0, 12);
             keys.forEach(k => subset[k] = obj[k]);
             return JSON.stringify(subset);
         } catch {
@@ -404,10 +511,14 @@ async function fetchAllPaged(baseUrl, pageSize = 1000, options = {}) {
         // Se o backend ignorar os parâmetros, a segunda página pode repetir a primeira; detecte e pare
         const beforeLen = all.length;
         for (const row of dataPage) {
-            const key = makeKey(row);
-            if (!seen.has(key)) {
-                seen.add(key);
+            if (disableDedupe) {
                 all.push(row);
+            } else {
+                const key = makeKey(row);
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    all.push(row);
+                }
             }
         }
 
@@ -417,7 +528,7 @@ async function fetchAllPaged(baseUrl, pageSize = 1000, options = {}) {
             // última página
             break;
         }
-        if (all.length === beforeLen) {
+        if (!disableDedupe && all.length === beforeLen) {
             // nada novo entrou; provavelmente o backend não suporta offset
             console.warn('⚠️ Nenhum novo registro após tentativa de paginação. Backend pode estar ignorando limit/offset.');
             break;
@@ -449,6 +560,7 @@ function parseSupabaseData(data) {
         // Converter nomes das colunas do Supabase para o formato esperado pela aplicação
         // Nota: As colunas no Supabase são em minúsculas com underscores
         const mapped = {
+            _id: row.id || null,
             'Área': row.área || '',
             'Formulário': row.formulário || '',
             'Usuário Avaliado': row.usuário_avaliado || '',
@@ -459,6 +571,12 @@ function parseSupabaseData(data) {
             'Classificação Calculada Desempenho': row.classificação_calculada_desempenho || '',
             'Nota Calculada Potencial': parseFloat(row.nota_calculada_potencial) || 0,
             'Classificação Calculada Potencial': row.classificação_calculada_potencial || '',
+            // Notas/classificações calibradas (quando existirem)
+            _nota_calibrada_desempenho: row.nota_calibrada_desempenho ? parseFloat(row.nota_calibrada_desempenho) : undefined,
+            _classificacao_calibrada_desempenho: row.classificação_calibrada_desempenho || undefined,
+            _nota_calibrada_potencial: row.nota_calibrada_potencial ? parseFloat(row.nota_calibrada_potencial) : undefined,
+            _classificacao_calibrada_potencial: row.classificação_calibrada_potencial || undefined,
+            _calibracao_comentarios: row.comentarios || '',
             'Nota Final Desempenho': parseFloat(row.nota_final_desempenho) || 0,
             'Classificação Final Desempenho': row.classificação_final_desempenho || '',
             'Nota Final Potencial': parseFloat(row.nota_final_potencial) || 0,
@@ -474,10 +592,10 @@ function parseSupabaseData(data) {
     console.log('🎯 Campos importantes:', {
         'Usuário Avaliado': allData[0]['Usuário Avaliado'],
         'Avaliado': allData[0]['Avaliado'],
-        'Nota Final Desempenho': allData[0]['Nota Final Desempenho'],
-        'Classificação Final Desempenho': allData[0]['Classificação Final Desempenho'],
-        'Nota Final Potencial': allData[0]['Nota Final Potencial'],
-        'Classificação Final Potencial': allData[0]['Classificação Final Potencial']
+        'Nota (efetiva) Desempenho': getEffectiveScores(allData[0]).desempenho,
+        'Classificação (efetiva) Desempenho': getEffectiveClassifications(allData[0]).desempenho,
+        'Nota (efetiva) Potencial': getEffectiveScores(allData[0]).potencial,
+        'Classificação (efetiva) Potencial': getEffectiveClassifications(allData[0]).potencial
     });
 }
 
@@ -821,6 +939,156 @@ function parseDate(dateStr) {
 function formatDate(dateStr) {
     if (!dateStr) return 'N/A';
     return dateStr;
+}
+
+// Calcular tempo de casa (anos e meses) a partir de uma data de admissão no formato DD/MM/AAAA
+function computeTenure(admissaoStr) {
+    if (!admissaoStr || typeof admissaoStr !== 'string') return '';
+    const parts = admissaoStr.split('/');
+    if (parts.length !== 3) return '';
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // 0-based
+    const year = parseInt(parts[2], 10);
+    if (!day || isNaN(month) || !year) return '';
+    const start = new Date(year, month, day);
+    if (isNaN(start.getTime())) return '';
+    const now = new Date();
+    let years = now.getFullYear() - start.getFullYear();
+    let months = now.getMonth() - start.getMonth();
+    if (now.getDate() < start.getDate()) {
+        months -= 1;
+    }
+    if (months < 0) {
+        years -= 1;
+        months += 12;
+    }
+    if (years < 0) return '';
+    const plural = (n, s, p) => (n === 1 ? s : p);
+    const anos = years > 0 ? `${years} ${plural(years, 'ano', 'anos')}` : '';
+    const meses = months > 0 ? `${months} ${plural(months, 'mês', 'meses')}` : (years === 0 ? '0 meses' : '');
+    return [anos, meses].filter(Boolean).join(' e ');
+}
+
+// Converter meses inteiros em string "X anos e Y meses"
+function monthsToYearsText(totalMonths) {
+    const m = parseInt(totalMonths, 10);
+    if (!isFinite(m) || m < 0) return '';
+    const years = Math.floor(m / 12);
+    const months = m % 12;
+    const parts = [];
+    if (years > 0) parts.push(`${years} ${years === 1 ? 'ano' : 'anos'}`);
+    if (months > 0) parts.push(`${months} ${months === 1 ? 'mês' : 'meses'}`);
+    if (parts.length === 0) return '0 meses';
+    return parts.join(' e ');
+}
+
+// Escapar texto para atributo HTML (title)
+function escapeAttr(str) {
+    try {
+        return (str == null ? '' : String(str))
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    } catch { return ''; }
+}
+
+// Agregar notas por competência para uma pessoa (Auto vs Gestor)
+function getCompetenciasForPerson(person) {
+    try {
+        if (!competenciasData || competenciasData.length === 0 || !person) return null;
+        const login = (person['Login do Avaliado'] || '').toString().trim();
+        const nome = (person['Usuário Avaliado'] || person['Avaliado'] || '').toString().trim();
+        const nomeNorm = normalizeText(nome);
+
+        // Potencial: 3 competências avaliadas apenas pelo gestor
+        const potencialSet = new Set([
+            normalizeText('Ambição e Motivação para Crescer'),
+            normalizeText('Aprendizado'),
+            normalizeText('Prontidão')
+        ]);
+
+        // Filtrar registros da pessoa
+        let items = [];
+        // Tentar por login se disponível
+        if (login) {
+            const loginUpper = login.toUpperCase();
+            items = competenciasData.filter(r => {
+                const u = (r.USER_LOGIN || r.user_login || r.Login || r.login || '').toString().trim().toUpperCase();
+                return u && u === loginUpper;
+            });
+        }
+        // Fallback por nome
+        if ((!items || items.length === 0) && nomeNorm) {
+            items = competenciasData.filter(r => normalizeText(r.NOME || r.Nome || r.nome || r.Avaliado || r['Usuário Avaliado'] || '') === nomeNorm);
+        }
+        if (!items || items.length === 0) return null;
+
+        // Agregadores por competência
+    const perfMap = new Map();
+    const potMap = new Map();
+
+        const get = (obj, keys) => {
+            for (const k of keys) {
+                if (obj[k] !== undefined && obj[k] !== null) return obj[k];
+            }
+            return undefined;
+        };
+
+        items.forEach(r => {
+            const compRaw = get(r, ['Competência','competência','competencia','Competencia']);
+            const tipo = (get(r, ['Tipo de Avaliador','tipo_de_avaliador','tipoAvaliador']) || '').toString().trim();
+            const nota = parseFloat(get(r, ['Nota','nota']));
+            if (!compRaw || !isFinite(nota)) return;
+
+            const compNorm = normalizeText(compRaw);
+            const isPot = potencialSet.has(compNorm);
+            const display = compRaw.toString();
+            const target = isPot ? potMap : perfMap;
+
+            if (!target.has(compNorm)) {
+                target.set(compNorm, { display, autoSum: 0, autoCount: 0, gestorSum: 0, gestorCount: 0, autoComments: [], gestorComments: [] });
+            }
+            const agg = target.get(compNorm);
+            if (tipo.toUpperCase() === 'AUTO AVALIAÇÃO' || tipo.toUpperCase() === 'AUTOAVALIAÇÃO' || tipo.toUpperCase() === 'AUTO') {
+                agg.autoSum += nota; agg.autoCount += 1;
+                const cmt = (get(r, ['Comentário','Comentario','comentario','comentário']) || '').toString().trim();
+                if (cmt) agg.autoComments.push(cmt);
+            } else if (tipo.toUpperCase() === 'GESTOR') {
+                agg.gestorSum += nota; agg.gestorCount += 1;
+                const cmt = (get(r, ['Comentário','Comentario','comentario','comentário']) || '').toString().trim();
+                if (cmt) agg.gestorComments.push(cmt);
+            }
+        });
+
+        const uniqJoin = (arr) => {
+            try {
+                const seen = new Set();
+                const uniq = [];
+                for (const s of arr) {
+                    const t = s.trim();
+                    if (t && !seen.has(t)) { seen.add(t); uniq.push(t); }
+                    if (uniq.length >= 6) break; // limitar a 6 comentários para o tooltip
+                }
+                return uniq.join(' • ');
+            } catch { return ''; }
+        };
+
+        const toArray = (map) => Array.from(map.values()).map(x => ({
+            competencia: x.display,
+            auto: x.autoCount > 0 ? (x.autoSum / x.autoCount) : null,
+            gestor: x.gestorCount > 0 ? (x.gestorSum / x.gestorCount) : null,
+            autoComments: uniqJoin(x.autoComments),
+            gestorComments: uniqJoin(x.gestorComments)
+        }))
+        // Ordenar alfabeticamente por competência
+        .sort((a,b) => (''+a.competencia).localeCompare((''+b.competencia), 'pt-BR'));
+
+        return { performance: toArray(perfMap), potencial: toArray(potMap) };
+    } catch (e) {
+        console.warn('Erro ao agregar competências:', e?.message || e);
+        return null;
+    }
 }
 
 // Carregar tabela de configuração de quadrantes
@@ -1568,8 +1836,9 @@ function getGridPositionByClassification(classifDesempenho, classifPotencial) {
 
 // Calcular ranking de uma pessoa
 function calculateRanking(person) {
-    const desempenho = person['Nota Final Desempenho'] || 0;
-    const potencial = person['Nota Final Potencial'] || 0;
+    const eff = getEffectiveScores(person);
+    const desempenho = eff.desempenho || 0;
+    const potencial = eff.potencial || 0;
     
     return (config.fatorDesempenho * desempenho) + (config.fatorPotencial * potencial);
 }
@@ -1607,6 +1876,7 @@ function createPersonItem(person, index, position, options = {}) {
     personDiv.dataset.personName = nome;
 
     const empData = getEmployeeByName(nome);
+    const isCalibrated = isPersonCalibrated(person);
     
     // Debug: verificar se não encontrou o funcionário
     if (!empData) {
@@ -1620,7 +1890,7 @@ function createPersonItem(person, index, position, options = {}) {
     // Visão compacta: apenas nome
     if (compactView) {
         personDiv.classList.add('person-item--compact');
-        personDiv.innerHTML = `<span class="compact-name" title="${nome}">${nome}</span>`;
+        personDiv.innerHTML = `<span class="compact-name" title="${nome}">${nome}</span>${isCalibrated ? '<span class="badge-calibrado badge-calibrado--tiny" title="Calibrado"></span>' : ''}`;
         personDiv.addEventListener('click', event => {
             event.stopPropagation();
             showPersonDetail(person);
@@ -1628,13 +1898,15 @@ function createPersonItem(person, index, position, options = {}) {
         return personDiv;
     }
 
-    const desempenhoValue = parseFloat(person['Nota Final Desempenho']);
-    const potencialValue = parseFloat(person['Nota Final Potencial']);
+    const effScores = getEffectiveScores(person);
+    const desempenhoValue = parseFloat(effScores.desempenho);
+    const potencialValue = parseFloat(effScores.potencial);
     const notaDesempenho = Number.isFinite(desempenhoValue) ? desempenhoValue.toFixed(2) : '--';
     const notaPotencial = Number.isFinite(potencialValue) ? potencialValue.toFixed(2) : '--';
 
-    const classifDesempenho = person['Classificação Final Desempenho'] || 'Sem classificação';
-    const classifPotencial = person['Classificação Final Potencial'] || 'Sem classificação';
+    const effClass = getEffectiveClassifications(person);
+    const classifDesempenho = effClass.desempenho || 'Sem classificação';
+    const classifPotencial = effClass.potencial || 'Sem classificação';
 
     const rankingEnabled = options.showRanking !== false && Number.isFinite(person.ranking) && person.ranking > 0;
     const rankingText = rankingEnabled ? person.ranking.toFixed(2) : null;
@@ -1659,6 +1931,8 @@ function createPersonItem(person, index, position, options = {}) {
             </div>
         ` : '';
 
+    const calibradoMarkup = isCalibrated ? `<span class="badge-calibrado" title="Notas calibradas salvas">Calibrado</span>` : '';
+
     personDiv.innerHTML = `
         <div class="person-header">
             <div class="person-rank">${index + 1}</div>
@@ -1666,6 +1940,7 @@ function createPersonItem(person, index, position, options = {}) {
                 <span class="person-name">${nome}</span>
                 <span class="person-role">${cargo}</span>
             </div>
+            ${calibradoMarkup}
             ${indicatorMarkup}
         </div>
         <div class="person-scores">
@@ -1734,8 +2009,9 @@ function updateNineBox() {
     const boxes = {};
     
     filteredData.forEach(person => {
-        const classifDesempenho = person['Classificação Final Desempenho'];
-        const classifPotencial = person['Classificação Final Potencial'];
+        const effClass = getEffectiveClassifications(person);
+        const classifDesempenho = effClass.desempenho;
+        const classifPotencial = effClass.potencial;
         
         if (!classifDesempenho || !classifPotencial) return;
         
@@ -1881,8 +2157,8 @@ function updateDashboard() {
     }
 
     const total = filteredData.length;
-    const avgPerformance = filteredData.reduce((sum, p) => sum + (p['Nota Final Desempenho'] || 0), 0) / (total || 1);
-    const avgPotential = filteredData.reduce((sum, p) => sum + (p['Nota Final Potencial'] || 0), 0) / (total || 1);
+    const avgPerformance = filteredData.reduce((sum, p) => sum + (getEffectiveScores(p).desempenho || 0), 0) / (total || 1);
+    const avgPotential = filteredData.reduce((sum, p) => sum + (getEffectiveScores(p).potencial || 0), 0) / (total || 1);
     const areas = new Set(filteredData.map(p => p['Área'])).size;
 
     totalEl.textContent = total;
@@ -1894,8 +2170,9 @@ function updateDashboard() {
     const quadrantStats = {};
     
     filteredData.forEach(person => {
-        const classifDesempenho = person['Classificação Final Desempenho'];
-        const classifPotencial = person['Classificação Final Potencial'];
+        const effClass = getEffectiveClassifications(person);
+        const classifDesempenho = effClass.desempenho;
+        const classifPotencial = effClass.potencial;
         
         if (!classifDesempenho || !classifPotencial) return;
         
@@ -1915,9 +2192,10 @@ function updateDashboard() {
         // ===== Resumo por grupos (alerta x core x topo) =====
         const positionFor = (d, p) => getGridPositionByClassification(d, p);
         const boxesCount = {};
-        filteredData.forEach(person => {
-                const d = person['Classificação Final Desempenho'];
-                const t = person['Classificação Final Potencial'];
+    filteredData.forEach(person => {
+        const effClass2 = getEffectiveClassifications(person);
+        const d = effClass2.desempenho;
+        const t = effClass2.potencial;
                 if (!d || !t) return;
                 const pos = positionFor(d, t);
                 boxesCount[pos] = (boxesCount[pos] || 0) + 1;
@@ -1996,8 +2274,9 @@ function showBoxDetail(row, col) {
     const people = [];
     
     filteredData.forEach(person => {
-        const classifDesempenho = person['Classificação Final Desempenho'];
-        const classifPotencial = person['Classificação Final Potencial'];
+        const effClass = getEffectiveClassifications(person);
+        const classifDesempenho = effClass.desempenho;
+        const classifPotencial = effClass.potencial;
         
         if (!classifDesempenho || !classifPotencial) return;
         
@@ -2018,12 +2297,14 @@ function showBoxDetail(row, col) {
     
     people.forEach((person, index) => {
         const rankingText = person.ranking > 0 ? ` - Ranking: ${person.ranking.toFixed(2)}` : '';
+        const eff = getEffectiveScores(person);
+        const effClass2 = getEffectiveClassifications(person);
         html += `
             <div class="person-detail">
                 <strong>${index + 1}º</strong> ${person['Usuário Avaliado'] || person['Avaliado']}${rankingText}<br>
                 <strong>Área:</strong> ${person['Área']}<br>
-                <strong>Desempenho:</strong> ${person['Nota Final Desempenho'].toFixed(2)} (${person['Classificação Final Desempenho']})<br>
-                <strong>Potencial:</strong> ${person['Nota Final Potencial'].toFixed(2)} (${person['Classificação Final Potencial']})<br>
+                <strong>Desempenho:</strong> ${Number(eff.desempenho||0).toFixed(2)} (${effClass2.desempenho})<br>
+                <strong>Potencial:</strong> ${Number(eff.potencial||0).toFixed(2)} (${effClass2.potencial})<br>
                 <strong>Avaliador:</strong> ${person['Avaliador']}
             </div>
         `;
@@ -2038,9 +2319,10 @@ function showBoxDetail(row, col) {
 // Mostrar detalhes de uma pessoa
 async function showPersonDetail(person) {
     const ranking = calculateRanking(person);
+    const effClass = getEffectiveClassifications(person);
     const position = getGridPositionByClassification(
-        person['Classificação Final Desempenho'],
-        person['Classificação Final Potencial']
+        effClass.desempenho,
+        effClass.potencial
     );
     const quadrante = config.quadrantes[position];
     const nome = person['Usuário Avaliado'] || person['Avaliado'];
@@ -2053,8 +2335,9 @@ async function showPersonDetail(person) {
     const diretoria = empData ? (empData['DIRETORIA'] || '') : '';
     const gerencia = empData ? (empData['GERENCIA'] || '') : '';
     const area = person['Área'] || '';
-    const desempenhoNota = (person['Nota Final Desempenho'] ?? 0).toFixed(2);
-    const potencialNota = (person['Nota Final Potencial'] ?? 0).toFixed(2);
+    const effScores = getEffectiveScores(person);
+    const desempenhoNota = (effScores.desempenho ?? 0).toFixed(2);
+    const potencialNota = (effScores.potencial ?? 0).toFixed(2);
 
     let html = `
         <div class="detail-shell" style="--accent-color: ${quadrante?.corQuadrante || '#003797'};">
@@ -2067,6 +2350,7 @@ async function showPersonDetail(person) {
                 <div class="header-metrics">
                     <span class="chip"><span class="chip-label">D</span> ${desempenhoNota}</span>
                     <span class="chip"><span class="chip-label">P</span> ${potencialNota}</span>
+                    ${isPersonCalibrated(person) ? `<span class=\"chip chip--success\" title=\"Notas calibradas salvas\">✓ Calibrado</span>` : ''}
                     ${ranking > 0 ? `<span class="chip"><span class="chip-label">R</span> ${ranking.toFixed(2)}</span>` : ''}
                     <span class="chip chip--accent">${quadrante?.titulo || 'Quadrante'}</span>
                 </div>
@@ -2076,9 +2360,21 @@ async function showPersonDetail(person) {
     `;
     
     // Card de Avaliação de Desempenho (sem emojis)
+    const initialD = (effScores.desempenho ?? 0).toFixed(2);
+    const initialP = (effScores.potencial ?? 0).toFixed(2);
+    const pc = getEffectiveClassifications(person);
     html += `
         <div class="person-detail">
-            <h3>Avaliação de Desempenho</h3>
+            <h3>
+                Avaliação de Desempenho
+                <span class="help-icon" title="Critérios de Avaliação&#10;&#10;Atende parcialmente: 0 a 2,49&#10;Dentro do esperado: 2,5 a 3,29&#10;Acima do esperado: 3,3 a 4">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </span>
+            </h3>
             <div class="person-detail-content">
                 <div class="info-grid-2col">
                     <div class="info-row-compact">
@@ -2090,23 +2386,34 @@ async function showPersonDetail(person) {
                         <span>${person['Formulário']}</span>
                     </div>
                     <div class="info-row-compact">
-                        <strong>Desempenho</strong>
+                        <label style="font-weight:600;">Desempenho (calibrado)</label>
                         <span>
-                            <span class="badge badge-success">${person['Nota Final Desempenho'].toFixed(2)}</span>
-                            ${person['Classificação Final Desempenho']}
+                            <input id="calib-desempenho" type="number" min="0" max="4" step="0.01" value="${initialD}" style="width:100px;"> 
+                            <span class="badge badge-success" id="calib-desempenho-class">${pc.desempenho}</span>
                         </span>
                     </div>
                     <div class="info-row-compact">
-                        <strong>Potencial</strong>
+                        <label style="font-weight:600;">Potencial (calibrado)</label>
                         <span>
-                            <span class="badge badge-success">${person['Nota Final Potencial'].toFixed(2)}</span>
-                            ${person['Classificação Final Potencial']}
+                            <input id="calib-potencial" type="number" min="0" max="4" step="0.01" value="${initialP}" style="width:100px;"> 
+                            <span class="badge badge-success" id="calib-potencial-class">${pc.potencial}</span>
                         </span>
                     </div>
                     <div class="info-row-compact">
                         <strong>Quadrante</strong>
                         <span><span class="badge">${quadrante.titulo}</span></span>
                     </div>
+                    <div class="info-row-compact" style="grid-column: 1 / -1;">
+                        <label style="font-weight:600;">Justificativa da calibração <span style="color:#c62828">(obrigatória)</span></label>
+                        <textarea id="calib-justificativa" rows="3" placeholder="Descreva a justificativa para a calibração..." style="width:100%; resize: vertical;">${(person._calibracao_comentarios || '').toString().replace(/</g,'&lt;')}</textarea>
+                        <div class="hint" style="font-size: 0.8em; color: #6b7a88;">Preencha a justificativa para salvar a calibração.</div>
+                    </div>
+                    ${person._calibracao_comentarios ? `
+                    <div class="info-row-compact" style="grid-column: 1 / -1;">
+                        <strong>Justificativa salva</strong>
+                        <span style="white-space: pre-wrap;">${(person._calibracao_comentarios || '').toString().replace(/</g,'&lt;')}</span>
+                    </div>
+                    ` : ''}
                     ${ranking > 0 ? `
                     <div class="info-row-compact">
                         <strong>Ranking</strong>
@@ -2117,6 +2424,9 @@ async function showPersonDetail(person) {
                         <strong>Avaliador</strong>
                         <span>${person['Avaliador']}</span>
                     </div>
+                </div>
+                <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:12px;">
+                    <button type="button" class="dev-save-btn" onclick="salvarCalibracao(${person._id || 'null'}, '${(person['Usuário Avaliado'] || person['Avaliado'] || '').toString().replace(/'/g, "\'")}')">Salvar Calibração</button>
                 </div>
             </div>
         </div>
@@ -2162,6 +2472,8 @@ async function showPersonDetail(person) {
     // Card de Informações Profissionais
     if (empData) {
         const mesa = getMesaByName(nome);
+        const adm = empData['ADMISSAO'] || '';
+        const tempoCasa = computeTenure(adm);
         
         html += `
             <div class="person-detail">
@@ -2195,6 +2507,10 @@ async function showPersonDetail(person) {
                         <div class="info-row-compact">
                             <strong>Data de Admissão</strong>
                             <span>${empData['ADMISSAO'] || 'N/A'}</span>
+                        </div>
+                        <div class="info-row-compact">
+                            <strong>Tempo de Casa</strong>
+                            <span>${tempoCasa || 'N/A'}</span>
                         </div>
                         ${mesa ? `
                         <div class="info-row-compact">
@@ -2249,6 +2565,163 @@ async function showPersonDetail(person) {
                 </div>
             </div>
         `;
+
+        // Card de Idiomas
+        try {
+            const idiomas = getIdiomasForPerson(person) || [];
+            const idiomasValidos = idiomas.filter(r => {
+                const lang = (r.Nome_Idioma || r.nome_idioma || '').toString().trim();
+                return lang && lang.toUpperCase() !== 'SEM INFORMAÇÃO';
+            });
+
+            const hasInfo = idiomasValidos.length > 0;
+            html += `
+                <div class="person-detail">
+                    <h3>Idiomas</h3>
+                    <div class="person-detail-content">
+                        ${hasInfo ? `
+                            <div style="display:flex; flex-direction:column; gap:10px;">
+                                ${idiomasValidos.map(r => {
+                                    const idioma = r.Nome_Idioma || r.nome_idioma || '—';
+                                    const nivel = (r.Nivel_Proficiencia || r.Nivel || r.nivel || '').toString().trim();
+                                    const obs = (r.Observações || r.Observacoes || r.observacoes || '').toString().trim();
+                                    return `
+                                    <div class="language-item">
+                                        <div class="language-name">${idioma}</div>
+                                        ${nivel ? `<span class="language-level">${nivel}</span>` : ''}
+                                        ${obs ? `<div class="language-obs">${obs.replace(/</g,'&lt;')}</div>` : ''}
+                                    </div>`;
+                                }).join('')}
+                            </div>
+                        ` : `
+                            <p style="color: #546e7a; margin: 0;">Sem informação</p>
+                        `}
+                    </div>
+                </div>
+            `;
+        } catch (e) {
+            console.warn('Falha ao renderizar idiomas:', e?.message || e);
+        }
+
+        // Card de Experiências Profissionais
+        try {
+            const exps = getExperienciasForPerson(person) || [];
+            const hasExp = exps.length > 0;
+            html += `
+                <div class="person-detail">
+                    <h3>Experiências Profissionais</h3>
+                    <div class="person-detail-content">
+                        ${hasExp ? `
+                            <div style="display:flex; flex-direction:column; gap:16px;">
+                                ${exps.map(r => {
+                                    const local = (r.Localidade || r.localidade || '').toString().trim();
+                                    const di = (r.Data_Inicio || r.data_inicio || '').toString().trim();
+                                    const df = (r.Data_Fim || r.data_fim || '').toString().trim();
+                                    const area = (r.Area_Conhecimento || r.area_conhecimento || '').toString().trim();
+                                    const meses = parseInt(r.Meses_Experiencia || r.meses_experiencia || 0, 10);
+                                    const dur = monthsToYearsText(meses);
+                                    const desc = (r.Descricao || r.descricao || '').toString().replace(/</g, '&lt;');
+                                    return `
+                                        <div class="experience-card">
+                                            <div class="experience-header">
+                                                <div>
+                                                    <div class="experience-title">${area || 'Experiência Profissional'}</div>
+                                                    <div class="experience-meta">
+                                                        ${local ? `<div class="experience-meta-item"><strong>📍</strong> ${local}</div>` : ''}
+                                                        ${di && df ? `<div class="experience-meta-item"><strong>📅</strong> ${di} — ${df}</div>` : ''}
+                                                    </div>
+                                                </div>
+                                                ${dur ? `<div class="experience-duration">${dur}</div>` : ''}
+                                            </div>
+                                            ${desc ? `<div class="experience-description">${desc}</div>` : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        ` : `
+                            <p style="color: #546e7a; margin: 0;">Sem informação</p>
+                        `}
+                    </div>
+                </div>
+            `;
+        } catch (e) {
+            console.warn('Falha ao renderizar experiências profissionais:', e?.message || e);
+        }
+
+        // Card de Notas por Competência (Auto x Gestor) e Potencial (somente Gestor)
+        try {
+            const comps = getCompetenciasForPerson(person);
+            if (comps && ((comps.performance && comps.performance.length) || (comps.potencial && comps.potencial.length))) {
+                const renderRow = (c) => {
+                    const autoVal = (c.auto ?? '') !== '' ? Number(c.auto) : null;
+                    const gestorVal = (c.gestor ?? '') !== '' ? Number(c.gestor) : null;
+                    const diff = (autoVal !== null && gestorVal !== null) ? Math.abs(gestorVal - autoVal) : 0;
+                    
+                    // Destaque de diferença: >= 2 (alerta laranja), >= 3 (crítico vermelho)
+                    let diffBadge = '';
+                    let rowHighlight = '';
+                    if (diff >= 3) {
+                        diffBadge = '<span style="display:inline-block; margin-left:6px; padding:2px 6px; background:#d32f2f; color:white; border-radius:4px; font-size:0.75em; font-weight:600;">Δ ' + diff.toFixed(1) + '</span>';
+                        rowHighlight = 'background: linear-gradient(90deg, #ffebee 0%, transparent 100%); border-left: 3px solid #d32f2f;';
+                    } else if (diff >= 2) {
+                        diffBadge = '<span style="display:inline-block; margin-left:6px; padding:2px 6px; background:#f57c00; color:white; border-radius:4px; font-size:0.75em; font-weight:600;">Δ ' + diff.toFixed(1) + '</span>';
+                        rowHighlight = 'background: linear-gradient(90deg, #fff3e0 0%, transparent 100%); border-left: 3px solid #f57c00;';
+                    }
+                    
+                    const autoCell = autoVal !== null 
+                        ? `<div class="nota-cell" data-nota="${autoVal.toFixed(2)}" title="${escapeAttr(c.autoComments || 'Sem comentários')}">${autoVal.toFixed(2)}</div>`
+                        : '<div style="text-align:center; color:#90a4ae;">—</div>';
+                    
+                    const gestorCell = gestorVal !== null 
+                        ? `<div class="nota-cell" data-nota="${gestorVal.toFixed(2)}" title="${escapeAttr(c.gestorComments || 'Sem comentários')}">${gestorVal.toFixed(2)}</div>`
+                        : '<div style="text-align:center; color:#90a4ae;">—</div>';
+                    
+                    return `
+                        <div style="display:grid; grid-template-columns: 1fr 100px 100px; gap:12px; align-items:center; padding:10px 12px; border-bottom: 1px solid #e8eef3; ${rowHighlight}">
+                            <div style="font-weight:600; color:#1a2332; display:flex; align-items:center;">
+                                ${c.competencia}
+                                ${diffBadge}
+                            </div>
+                            ${autoCell}
+                            ${gestorCell}
+                        </div>`;
+                };
+
+                const hasPerf = comps.performance && comps.performance.length > 0;
+                const hasPot = comps.potencial && comps.potencial.length > 0;
+
+                html += `
+                    <div class="person-detail">
+                        <h3>Notas por Competência</h3>
+                        <div class="person-detail-content" style="padding:0;">
+                            ${hasPerf ? `
+                                <div style="margin-bottom:20px;">
+                                    <div style="background:#f5f8fa; padding:12px 16px; border-bottom:2px solid #003797; display:grid; grid-template-columns: 1fr 100px 100px; gap:12px; font-weight:700; color:#1a2332; font-size:0.9em;">
+                                        <div>Competência - Desempenho</div>
+                                        <div style="text-align:center;">Auto</div>
+                                        <div style="text-align:center;">Gestor</div>
+                                    </div>
+                                    ${comps.performance.map(renderRow).join('')}
+                                </div>
+                            ` : ''}
+
+                            ${hasPot ? `
+                                <div>
+                                    <div style="background:#f5f8fa; padding:12px 16px; border-bottom:2px solid #003797; display:grid; grid-template-columns: 1fr 100px 100px; gap:12px; font-weight:700; color:#1a2332; font-size:0.9em;">
+                                        <div>Competência - Potencial <span class="hint" style="margin-left:6px; font-weight:400;">(somente gestor avalia)</span></div>
+                                        <div style="text-align:center;">Auto</div>
+                                        <div style="text-align:center;">Gestor</div>
+                                    </div>
+                    ${comps.potencial.map(c => renderRow({ ...c, auto: null, autoComments: '' })).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+        } catch (e) {
+            console.warn('Falha ao renderizar competências:', e?.message || e);
+        }
     } else {
         html += `
             <div class="no-data-message">
@@ -2858,6 +3331,86 @@ async function salvarDesenvolvimento(nome) {
     }
 }
 
+// Salvar calibração de notas (desempenho/potencial) e reposicionar no NineBox
+async function salvarCalibracao(avaliacaoId, nome) {
+    try {
+        const inpD = document.getElementById('calib-desempenho');
+        const inpP = document.getElementById('calib-potencial');
+        const inpJ = document.getElementById('calib-justificativa');
+        if (!inpD || !inpP) return;
+
+        let notaD = parseFloat(inpD.value);
+        let notaP = parseFloat(inpP.value);
+        if (!isFinite(notaD)) notaD = 0;
+        if (!isFinite(notaP)) notaP = 0;
+
+        // Garantir faixa 0..4
+        notaD = Math.min(4, Math.max(0, notaD));
+        notaP = Math.min(4, Math.max(0, notaP));
+
+        // Justificativa obrigatória
+        const justificativa = (inpJ?.value || '').trim();
+        if (!justificativa) {
+            showNotification('warning', 'Justificativa obrigatória', 'Informe a justificativa da calibração antes de salvar.');
+            if (inpJ) inpJ.focus();
+            return;
+        }
+
+        // Atualizar UI local imediata nos badges de classe
+        const badgeD = document.getElementById('calib-desempenho-class');
+        const badgeP = document.getElementById('calib-potencial-class');
+        if (badgeD) badgeD.textContent = getClassificationByScore(notaD);
+        if (badgeP) badgeP.textContent = getClassificationByScore(notaP);
+
+        // Persistir no backend se tivermos o id
+        if (avaliacaoId) {
+            const resp = await fetch(`${API_BASE_URL}/avaliacoes/${avaliacaoId}/calibracao`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nota_calibrada_desempenho: notaD,
+                    nota_calibrada_potencial: notaP,
+                    comentarios: justificativa
+                })
+            });
+            if (!resp.ok) {
+                const t = await resp.text();
+                throw new Error(`Falha ao salvar calibração (${resp.status}): ${t}`);
+            }
+        }
+
+        // Atualizar no estado local (allData)
+        const person = allData.find(p => (p._id && p._id === avaliacaoId)) || allData.find(p => (p['Usuário Avaliado'] || p['Avaliado']) === nome);
+        if (person) {
+            person._nota_calibrada_desempenho = notaD;
+            person._nota_calibrada_potencial = notaP;
+            person._classificacao_calibrada_desempenho = getClassificationByScore(notaD);
+            person._classificacao_calibrada_potencial = getClassificationByScore(notaP);
+            person._calibracao_comentarios = justificativa;
+
+            // Se havia override manual para esta pessoa, removê-lo para usar o novo cálculo pelas notas
+            const personName = person['Usuário Avaliado'] || person['Avaliado'];
+            if (manualOverrides[personName]) {
+                delete manualOverrides[personName];
+                saveChangesToLocalStorage();
+            }
+        }
+
+        // Recalcular e re-renderizar
+        applyFilters(); // mantém filtros atuais e re-renderiza NineBox + Dashboard
+
+        // Reabrir detalhe com dados atualizados
+        if (person) {
+            showPersonDetail(person);
+        }
+
+        showNotification('success', 'Calibração salva', 'Notas calibradas atualizadas com justificativa e quadrante ajustado.');
+    } catch (e) {
+        console.error('Erro ao salvar calibração:', e);
+        showNotification('error', 'Erro ao salvar calibração', e?.message || String(e));
+    }
+}
+
 // Event listener para mostrar/ocultar campo "Outros" da sucessão
 document.addEventListener('change', function(e) {
     if (e.target && e.target.id === 'dev-sucessao') {
@@ -2984,8 +3537,9 @@ function handleDrop(e) {
     console.log('Target quadrant:', targetQuadrant);
     
     const personName = draggedPersonData['Usuário Avaliado'] || draggedPersonData['Avaliado'];
-    const notaDesempenho = draggedPersonData['Nota Final Desempenho'];
-    const notaPotencial = draggedPersonData['Nota Final Potencial'];
+    const effDragged = getEffectiveScores(draggedPersonData);
+    const notaDesempenho = effDragged.desempenho;
+    const notaPotencial = effDragged.potencial;
     
     console.log('Moving person:', personName, 'to quadrant:', boxId);
     
@@ -3051,9 +3605,39 @@ function analyzeQuadrantFit(notaDesempenho, notaPotencial, expectedDesempenho, e
 
 // Converter nota em classificação
 function getClassificationByScore(score) {
-    if (score < 2) return 'Atende parcialmente';
-    if (score < 3) return 'Atende dentro da expectativa';
+    const n = parseFloat(score);
+    if (!isFinite(n)) return '';
+    if (n <= 2.49) return 'Atende parcialmente';
+    if (n <= 3.29) return 'Atende dentro da expectativa';
     return 'Supera a expectativa';
+}
+
+// Helpers: obter notas/classificações efetivas (preferir calibradas quando existirem)
+function getEffectiveScores(person) {
+    const dCal = parseFloat(person._nota_calibrada_desempenho);
+    const pCal = parseFloat(person._nota_calibrada_potencial);
+    const dOrig = parseFloat(person['Nota Final Desempenho']);
+    const pOrig = parseFloat(person['Nota Final Potencial']);
+    const desempenho = isFinite(dCal) ? dCal : (isFinite(dOrig) ? dOrig : 0);
+    const potencial = isFinite(pCal) ? pCal : (isFinite(pOrig) ? pOrig : 0);
+    return { desempenho, potencial };
+}
+
+function getEffectiveClassifications(person) {
+    // Se há nota calibrada, classifica pela nota, senão usa classificação final existente
+    const eff = getEffectiveScores(person);
+    const hasDCal = isFinite(parseFloat(person._nota_calibrada_desempenho));
+    const hasPCal = isFinite(parseFloat(person._nota_calibrada_potencial));
+    const classifDesempenho = hasDCal ? getClassificationByScore(eff.desempenho) : (person['Classificação Final Desempenho'] || '');
+    const classifPotencial = hasPCal ? getClassificationByScore(eff.potencial) : (person['Classificação Final Potencial'] || '');
+    return { desempenho: classifDesempenho, potencial: classifPotencial };
+}
+
+// Helper: verifica se a pessoa possui notas calibradas (D ou P)
+function isPersonCalibrated(person) {
+    const dCal = parseFloat(person._nota_calibrada_desempenho);
+    const pCal = parseFloat(person._nota_calibrada_potencial);
+    return Number.isFinite(dCal) || Number.isFinite(pCal);
 }
 
 // Mostrar notificação
@@ -3086,8 +3670,9 @@ function updateNineBoxWithOverrides() {
         if (manualOverrides[personName]) {
             position = manualOverrides[personName];
         } else {
-            const classifDesempenho = person['Classificação Final Desempenho'];
-            const classifPotencial = person['Classificação Final Potencial'];
+            const effClass = getEffectiveClassifications(person);
+            const classifDesempenho = effClass.desempenho;
+            const classifPotencial = effClass.potencial;
 
             if (!classifDesempenho || !classifPotencial) {
                 return;
@@ -3126,9 +3711,10 @@ function updateNineBoxWithOverrides() {
             let analysis = null;
 
             if (hasManualOverride) {
+                const eff = getEffectiveScores(person);
                 analysis = analyzeQuadrantFit(
-                    person['Nota Final Desempenho'],
-                    person['Nota Final Potencial'],
+                    eff.desempenho,
+                    eff.potencial,
                     quadrante.eixoX,
                     quadrante.eixoY
                 );
