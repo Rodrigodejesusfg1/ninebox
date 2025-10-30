@@ -1,18 +1,17 @@
-// Configuração de ambiente para produção
-// Este arquivo deve ser atualizado após o deploy com a URL correta da API
+// Configuração de ambiente para a aplicação
+// Em produção, usamos sempre same-origin (window.location.origin + '/api') para evitar CORS
 
 window.ENV_CONFIG = {
     // Desenvolvimento local
     API_BASE_URL_DEV: 'http://localhost:8000/api',
-    
-    // Produção no Render
-    // Substitua pela URL real da sua API
-    API_BASE_URL_PROD: 'https://avaliacaodedesempenhoreframax.onrender.com/api',
-    
-    // Detecta automaticamente o ambiente
+
+    // Produção (same-origin, independente do subdomínio gerado pelo Render)
     getApiUrl: function() {
-        const isDev = window.location.hostname === 'localhost' || 
-                      window.location.hostname === '127.0.0.1';
-        return isDev ? this.API_BASE_URL_DEV : this.API_BASE_URL_PROD;
+        const host = (window.location.hostname || '').toLowerCase();
+        const isDev = host === 'localhost' || host === '127.0.0.1';
+        if (isDev) {
+            return this.API_BASE_URL_DEV;
+        }
+        return `${window.location.origin}/api`;
     }
 };
