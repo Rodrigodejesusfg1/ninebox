@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -10,6 +10,7 @@ import logging
 import ssl
 import warnings
 import traceback
+import re
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -95,6 +96,46 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Fallback robusto de CORS: garante cabeçalhos mesmo em respostas de erro/404/preflight
+@app.middleware("http")
+async def ensure_cors_headers(request: Request, call_next):
+    # Responder preflight diretamente
+    if request.method.upper() == "OPTIONS":
+        resp = Response(status_code=204)
+    else:
+        resp = await call_next(request)
+
+    origin = request.headers.get("origin") or ""
+    allow_origin_value = None
+
+    if not _allow_credentials:
+        # Sem credenciais, liberar wildcard resolve 99% dos casos
+        allow_origin_value = "*"
+    else:
+        # Com credenciais, refletir origem apenas se estiver permitida
+        if origin in allowed_origins_list:
+            allow_origin_value = origin
+        elif allowed_origin_regex and re.match(allowed_origin_regex, origin):
+            allow_origin_value = origin
+
+    if allow_origin_value:
+        resp.headers["Access-Control-Allow-Origin"] = allow_origin_value
+        # Evitar cache incorreto quando refletindo origem
+        if allow_origin_value != "*":
+            prev_vary = resp.headers.get("Vary")
+            resp.headers["Vary"] = (prev_vary + ", Origin") if prev_vary else "Origin"
+
+    # Métodos e headers
+    resp.headers.setdefault("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+    req_headers = request.headers.get("access-control-request-headers")
+    if req_headers:
+        resp.headers["Access-Control-Allow-Headers"] = req_headers
+    else:
+        resp.headers.setdefault("Access-Control-Allow-Headers", "*")
+
+    resp.headers["Access-Control-Allow-Credentials"] = "true" if _allow_credentials else "false"
+    return resp
 
 # Inicializar cliente Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -232,12 +273,22 @@ async def cors_debug(request: Request):
     """
     try:
         origin = request.headers.get("origin")
-        return {
+        info = {
             "origin": origin,
             "allowed_origins": allowed_origins_list,
             "allowed_origin_regex": allowed_origin_regex,
-            "credentials": True,
+            "credentials": _allow_credentials,
         }
+        # Indicar se a origem atual passaria pelo filtro
+        try:
+            info["origin_allowed"] = (
+                (not _allow_credentials) or
+                (origin in allowed_origins_list) or
+                (allowed_origin_regex is not None and bool(re.match(allowed_origin_regex, origin or "")))
+            )
+        except Exception:
+            info["origin_allowed"] = False
+        return info
     except Exception as e:
         logger.error(f"Erro no _cors_debug: {e}")
         return {"error": str(e)}
