@@ -62,6 +62,7 @@ app = FastAPI(title="NineBox API", version="1.0.0")
 # Observação importante: quando allow_credentials=True, NÃO podemos usar "*" em allow_origins.
 _env_allowed = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 _env_allowed = [o.strip() for o in _env_allowed if o.strip()]
+_allow_credentials = os.getenv("ALLOW_CREDENTIALS", "false").strip().lower() == "true"
 
 # Adicionar domínio(s) do frontend automaticamente
 frontend_domains = [
@@ -70,22 +71,27 @@ frontend_domains = [
     "http://127.0.0.1:8000",
 ]
 
-# Se o .env estiver com "*" (ou vazio), use os domínios conhecidos ao invés de wildcard
+# Se o .env estiver com "*" (ou vazio), defina comportamento conforme credenciais
 if not _env_allowed or _env_allowed == ["*"]:
-    allowed_origins_list = frontend_domains
+    if _allow_credentials:
+        # Com credenciais, precisamos ser explícitos: use domínios conhecidos
+        allowed_origins_list = frontend_domains
+    else:
+        # Sem credenciais, podemos liberar wildcard
+        allowed_origins_list = ["*"]
 else:
     allowed_origins_list = sorted(set(_env_allowed + frontend_domains))
 
-# Opcional: aceitar qualquer sufixo gerado pelo Render para este app estático
-allowed_origin_regex = r"^https://avaliacaodedesempenhoreframax-[a-z0-9]+\.onrender\.com$"
+# Opcional: aceitar qualquer sufixo gerado pelo Render para este app estático (aplicado apenas quando não for wildcard)
+allowed_origin_regex = None if (allowed_origins_list == ["*"]) else r"^https://avaliacaodedesempenhoreframax-[a-z0-9]+\.onrender\.com$"
 
-logger.info(f"CORS allow_origins: {allowed_origins_list}; allow_origin_regex: {allowed_origin_regex}")
+logger.info(f"CORS allow_origins: {allowed_origins_list}; allow_origin_regex: {allowed_origin_regex}; allow_credentials: {_allow_credentials}")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins_list,
     allow_origin_regex=allowed_origin_regex,
-    allow_credentials=True,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
