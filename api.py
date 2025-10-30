@@ -59,10 +59,20 @@ from supabase import create_client, Client
 app = FastAPI(title="NineBox API", version="1.0.0")
 
 # Configurar CORS - Em produção, especifique os domínios permitidos
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+# Se ALLOWED_ORIGINS não estiver definido, permitir ambos os domínios Render
+default_origins = "https://avaliacaodedesempenhoreframax-6fvh.onrender.com,https://avaliacaodedesempenhoreframax.onrender.com"
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", default_origins).split(",")
+
+# Adicionar suporte para localhost em desenvolvimento
+if is_local_env:
+    ALLOWED_ORIGINS.append("http://localhost:8000")
+    ALLOWED_ORIGINS.append("http://127.0.0.1:8000")
+
+logger.info(f"🔒 CORS configurado para: {ALLOWED_ORIGINS}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],  # TEMPORÁRIO: Permitir todas as origens
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -165,11 +175,25 @@ async def serve_login_css():
 # Servir arquivos de imagem/logo na raiz
 @app.get("/logo-reframax.svg")
 async def serve_logo_svg():
+    if not os.path.exists("logo-reframax.svg"):
+        raise HTTPException(status_code=404, detail="Logo SVG não encontrado")
     return FileResponse("logo-reframax.svg")
 
 @app.get("/REFRAMAX_.jpeg")
 async def serve_logo_jpeg():
+    if not os.path.exists("REFRAMAX_.jpeg"):
+        raise HTTPException(status_code=404, detail="Logo JPEG não encontrado")
     return FileResponse("REFRAMAX_.jpeg")
+
+@app.get("/favicon.ico")
+async def serve_favicon():
+    # Retornar o logo como favicon se não houver um específico
+    if os.path.exists("favicon.ico"):
+        return FileResponse("favicon.ico")
+    elif os.path.exists("REFRAMAX_.jpeg"):
+        return FileResponse("REFRAMAX_.jpeg")
+    else:
+        raise HTTPException(status_code=404, detail="Favicon não encontrado")
 
 # ===== Endpoints da API =====
 @app.get("/api")
