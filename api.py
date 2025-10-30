@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -59,24 +59,32 @@ from supabase import create_client, Client
 app = FastAPI(title="NineBox API", version="1.0.0")
 
 # Configurar CORS - Em produção, especifique os domínios permitidos
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+# Observação importante: quando allow_credentials=True, NÃO podemos usar "*" em allow_origins.
+_env_allowed = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+_env_allowed = [o.strip() for o in _env_allowed if o.strip()]
 
-# Adicionar domínio do frontend automaticamente
+# Adicionar domínio(s) do frontend automaticamente
 frontend_domains = [
     "https://avaliacaodedesempenhoreframax-6fvh.onrender.com",
     "http://localhost:8000",
-    "http://127.0.0.1:8000"
+    "http://127.0.0.1:8000",
 ]
 
-# Combinar origins do .env com os domínios conhecidos
-if ALLOWED_ORIGINS == ["*"]:
-    allowed_origins_list = ["*"]
+# Se o .env estiver com "*" (ou vazio), use os domínios conhecidos ao invés de wildcard
+if not _env_allowed or _env_allowed == ["*"]:
+    allowed_origins_list = frontend_domains
 else:
-    allowed_origins_list = list(set(ALLOWED_ORIGINS + frontend_domains))
+    allowed_origins_list = sorted(set(_env_allowed + frontend_domains))
+
+# Opcional: aceitar qualquer sufixo gerado pelo Render para este app estático
+allowed_origin_regex = r"^https://avaliacaodedesempenhoreframax-[a-z0-9]+\.onrender\.com$"
+
+logger.info(f"CORS allow_origins: {allowed_origins_list}; allow_origin_regex: {allowed_origin_regex}")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins_list,
+    allow_origin_regex=allowed_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -209,6 +217,24 @@ async def health_check():
     except Exception as e:
         logger.error(f"Erro na verificação de saúde: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao conectar com Supabase: {str(e)}")
+
+
+@app.get("/api/_cors_debug")
+async def cors_debug(request: Request):
+    """Endpoint de diagnóstico para verificar CORS em produção.
+    Retorna o Origin do request e as configurações ativas do servidor.
+    """
+    try:
+        origin = request.headers.get("origin")
+        return {
+            "origin": origin,
+            "allowed_origins": allowed_origins_list,
+            "allowed_origin_regex": allowed_origin_regex,
+            "credentials": True,
+        }
+    except Exception as e:
+        logger.error(f"Erro no _cors_debug: {e}")
+        return {"error": str(e)}
 
 
 @app.post("/api/login")
