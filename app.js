@@ -2321,17 +2321,14 @@ function showBoxDetail(row, col) {
 async function showPersonDetail(person) {
     const ranking = calculateRanking(person);
     const effClass = getEffectiveClassifications(person);
-    const position = getGridPositionByClassification(
-        effClass.desempenho,
-        effClass.potencial
-    );
+    const position = getGridPositionByClassification(effClass.desempenho, effClass.potencial);
     const quadrante = config.quadrantes[position];
     const nome = person['Usuário Avaliado'] || person['Avaliado'];
-    
-    // Buscar dados adicionais do funcionário
+
+    // Dados adicionais do funcionário
     const empData = getEmployeeByName(nome);
-    
-    // Header e shell minimalista e horizontal
+
+    // Header minimalista
     const cargo = empData ? (empData['CARGO'] || 'Colaborador') : 'Colaborador';
     const diretoria = empData ? (empData['DIRETORIA'] || '') : '';
     const gerencia = empData ? (empData['GERENCIA'] || '') : '';
@@ -2356,19 +2353,18 @@ async function showPersonDetail(person) {
                     <span class="chip chip--accent">${quadrante?.titulo || 'Quadrante'}</span>
                 </div>
             </div>
-            <div class="detail-grid">
-                <div>
     `;
-    
-    // Card de Avaliação de Desempenho (sem emojis)
+
+    // ====== construir blocos isolados ======
+    // 3.1 Card de Avaliação (EDITÁVEL) — vai para Sessão 3
     const initialD = (effScores.desempenho ?? 0).toFixed(2);
     const initialP = (effScores.potencial ?? 0).toFixed(2);
     const pc = getEffectiveClassifications(person);
-    html += `
+    const perfEditableCard = `
         <div class="person-detail">
             <h3>
                 Avaliação de Desempenho
-                <span class="help-icon" title="Critérios de Avaliação&#10;&#10;Atende parcialmente: 0 a 2,49&#10;Dentro do esperado: 2,5 a 3,29&#10;Acima do esperado: 3,3 a 4">
+                <span class="help-icon" title="Critérios de Avaliação\n\nAtende parcialmente: 0 a 2,49\nDentro do esperado: 2,5 a 3,29\nAcima do esperado: 3,3 a 4">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10"></circle>
                         <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
@@ -2430,19 +2426,17 @@ async function showPersonDetail(person) {
                     <button type="button" class="dev-save-btn" onclick="salvarCalibracao(${person._id || 'null'}, '${(person['Usuário Avaliado'] || person['Avaliado'] || '').toString().replace(/'/g, "\'")}')">Salvar Calibração</button>
                 </div>
             </div>
-        </div>
-    `;
-    
-    // Card de Comparação com 2024
+        </div>`;
+
+    // 2.1 Comparação com 2024 — Sessão 2
+    let comparison2024Card = '';
     const comparison = getPerformanceComparison(nome, person['Nota Final Desempenho']);
     if (comparison) {
         const isPositive = comparison.tendencia === 'aumento';
         const isNegative = comparison.tendencia === 'queda';
-        const iconTendencia = '';
         const corTendencia = isPositive ? '#4caf50' : isNegative ? '#f44336' : '#ff9800';
         const textTendencia = isPositive ? 'Aumento' : isNegative ? 'Queda' : 'Estável';
-        
-        html += `
+        comparison2024Card = `
             <div class="person-detail" style="border-left: 4px solid ${corTendencia};">
                 <h3>Comparação de Desempenho (2024 vs 2025)</h3>
                 <div class="person-detail-content">
@@ -2457,313 +2451,212 @@ async function showPersonDetail(person) {
                         </div>
                         <div style="text-align: center; padding: 10px; background: ${corTendencia}15; border-radius: 6px; border: 2px solid ${corTendencia};">
                             <div style="font-size: 0.75em; color: #666; margin-bottom: 3px;">Variação</div>
-                            <div style="font-size: 1.5em; font-weight: bold; color: ${corTendencia};">
-                                ${parseFloat(comparison.variacao) > 0 ? '+' : ''}${comparison.variacao}
-                            </div>
+                            <div style="font-size: 1.5em; font-weight: bold; color: ${corTendencia};">${parseFloat(comparison.variacao) > 0 ? '+' : ''}${comparison.variacao}</div>
                         </div>
                     </div>
                     <div style="text-align: center; padding: 8px; background: ${corTendencia}; color: white; border-radius: 6px; font-weight: 600; font-size: 0.85em;">
                         ${textTendencia} de ${Math.abs(parseFloat(comparison.variacaoPercentual)).toFixed(1)}% em relação a 2024
                     </div>
                 </div>
-            </div>
-        `;
+            </div>`;
     }
-    
-    // Card de Informações Profissionais
+
+    // 1.x Blocos de dados profissionais e pessoais — Sessão 1
+    let profissionalCard = '';
+    let pessoaisCard = '';
+    let idiomasCard = '';
+    let experienciasCard = '';
     if (empData) {
         const mesa = getMesaByName(nome);
         const adm = empData['ADMISSAO'] || '';
         const tempoCasa = computeTenure(adm);
-        
-        html += `
+        profissionalCard = `
             <div class="person-detail">
                 <h3>Informações Profissionais</h3>
                 <div class="person-detail-content">
                     <div class="info-grid-2col">
-                        <div class="info-row-compact">
-                            <strong>Registro</strong>
-                            <span>${empData['Registro'] || 'N/A'}</span>
-                        </div>
-                        <div class="info-row-compact">
-                            <strong>Cargo</strong>
-                            <span>${empData['CARGO'] || 'N/A'}</span>
-                        </div>
-                        <div class="info-row-compact">
-                            <strong>Diretoria</strong>
-                            <span>${empData['DIRETORIA'] || 'N/A'}</span>
-                        </div>
-                        <div class="info-row-compact">
-                            <strong>Gerência</strong>
-                            <span>${empData['GERENCIA'] || 'N/A'}</span>
-                        </div>
-                        <div class="info-row-compact">
-                            <strong>Unidade</strong>
-                            <span>${empData['UNIDADE'] || 'N/A'}</span>
-                        </div>
-                        <div class="info-row-compact">
-                            <strong>Localidade</strong>
-                            <span>${empData['LOCALIDADE'] || 'N/A'}</span>
-                        </div>
-                        <div class="info-row-compact">
-                            <strong>Data de Admissão</strong>
-                            <span>${empData['ADMISSAO'] || 'N/A'}</span>
-                        </div>
-                        <div class="info-row-compact">
-                            <strong>Tempo de Casa</strong>
-                            <span>${tempoCasa || 'N/A'}</span>
-                        </div>
+                        <div class="info-row-compact"><strong>Registro</strong><span>${empData['Registro'] || 'N/A'}</span></div>
+                        <div class="info-row-compact"><strong>Cargo</strong><span>${empData['CARGO'] || 'N/A'}</span></div>
+                        <div class="info-row-compact"><strong>Diretoria</strong><span>${empData['DIRETORIA'] || 'N/A'}</span></div>
+                        <div class="info-row-compact"><strong>Gerência</strong><span>${empData['GERENCIA'] || 'N/A'}</span></div>
+                        <div class="info-row-compact"><strong>Unidade</strong><span>${empData['UNIDADE'] || 'N/A'}</span></div>
+                        <div class="info-row-compact"><strong>Localidade</strong><span>${empData['LOCALIDADE'] || 'N/A'}</span></div>
+                        <div class="info-row-compact"><strong>Data de Admissão</strong><span>${empData['ADMISSAO'] || 'N/A'}</span></div>
+                        <div class="info-row-compact"><strong>Tempo de Casa</strong><span>${tempoCasa || 'N/A'}</span></div>
                         ${mesa ? `
-                        <div class="info-row-compact">
-                            <strong>Mesa</strong>
-                            <span>${mesa.mesa !== undefined && mesa.mesa !== '' ? mesa.mesa : 'N/A'}</span>
-                        </div>
-                        <div class="info-row-compact">
-                            <strong>Líder</strong>
-                            <span>${mesa.lider || 'N/A'}</span>
-                        </div>
-                        <div class="info-row-compact">
-                            <strong>Pai</strong>
-                            <span>${mesa.pai || 'N/A'}</span>
-                        </div>
-                        <div class="info-row-compact">
-                            <strong>Avô</strong>
-                            <span>${mesa.avo || 'N/A'}</span>
-                        </div>
+                        <div class="info-row-compact"><strong>Mesa</strong><span>${mesa.mesa !== undefined && mesa.mesa !== '' ? mesa.mesa : 'N/A'}</span></div>
+                        <div class="info-row-compact"><strong>Líder</strong><span>${mesa.lider || 'N/A'}</span></div>
+                        <div class="info-row-compact"><strong>Pai</strong><span>${mesa.pai || 'N/A'}</span></div>
+                        <div class="info-row-compact"><strong>Avô</strong><span>${mesa.avo || 'N/A'}</span></div>
                         ` : ''}
                     </div>
                 </div>
-            </div>
-        `;
-        
-        // Card de Dados Pessoais
-        html += `
+            </div>`;
+
+        pessoaisCard = `
             <div class="person-detail">
                 <h3>Dados Pessoais</h3>
                 <div class="person-detail-content">
                     <div class="info-grid-2col">
-                        <div class="info-row-compact">
-                            <strong>Idade</strong>
-                            <span>${empData['IDADE'] || 'N/A'} anos</span>
-                        </div>
-                        <div class="info-row-compact">
-                            <strong>Sexo</strong>
-                            <span>${empData['SEXO'] || 'N/A'}</span>
-                        </div>
-                        <div class="info-row-compact">
-                            <strong>Naturalidade</strong>
-                            <span>${empData['NATURALIDADE'] || 'N/A'}</span>
-                        </div>
-                        <div class="info-row-compact">
-                            <strong>Escolaridade</strong>
-                            <span>${empData['ESCOLARIDADE'] || 'N/A'}</span>
-                        </div>
-                        <div class="info-row-compact">
-                            <strong>Cidade</strong>
-                            <span>${empData['CIDADE'] || 'N/A'}</span>
-                        </div>
+                        <div class="info-row-compact"><strong>Idade</strong><span>${empData['IDADE'] || 'N/A'} anos</span></div>
+                        <div class="info-row-compact"><strong>Sexo</strong><span>${empData['SEXO'] || 'N/A'}</span></div>
+                        <div class="info-row-compact"><strong>Naturalidade</strong><span>${empData['NATURALIDADE'] || 'N/A'}</span></div>
+                        <div class="info-row-compact"><strong>Escolaridade</strong><span>${empData['ESCOLARIDADE'] || 'N/A'}</span></div>
+                        <div class="info-row-compact"><strong>Cidade</strong><span>${empData['CIDADE'] || 'N/A'}</span></div>
                     </div>
                 </div>
-            </div>
-        `;
+            </div>`;
 
-        // Card de Idiomas
         try {
             const idiomas = getIdiomasForPerson(person) || [];
             const idiomasValidos = idiomas.filter(r => {
                 const lang = (r.Nome_Idioma || r.nome_idioma || '').toString().trim();
                 return lang && lang.toUpperCase() !== 'SEM INFORMAÇÃO';
             });
-
             const hasInfo = idiomasValidos.length > 0;
-            html += `
+            idiomasCard = `
                 <div class="person-detail">
                     <h3>Idiomas</h3>
                     <div class="person-detail-content">
                         ${hasInfo ? `
-                            <div style="display:flex; flex-direction:column; gap:10px;">
-                                ${idiomasValidos.map(r => {
-                                    const idioma = r.Nome_Idioma || r.nome_idioma || '—';
-                                    const nivel = (r.Nivel_Proficiencia || r.Nivel || r.nivel || '').toString().trim();
-                                    const obs = (r.Observações || r.Observacoes || r.observacoes || '').toString().trim();
-                                    return `
-                                    <div class="language-item">
-                                        <div class="language-name">${idioma}</div>
-                                        ${nivel ? `<span class="language-level">${nivel}</span>` : ''}
-                                        ${obs ? `<div class="language-obs">${obs.replace(/</g,'&lt;')}</div>` : ''}
-                                    </div>`;
-                                }).join('')}
-                            </div>
-                        ` : `
-                            <p style="color: #546e7a; margin: 0;">Sem informação</p>
-                        `}
+                            <div style=\"display:flex; flex-direction:column; gap:10px;\">${idiomasValidos.map(r => {
+                                const idioma = r.Nome_Idioma || r.nome_idioma || '—';
+                                const nivel = (r.Nivel_Proficiencia || r.Nivel || r.nivel || '').toString().trim();
+                                const obs = (r.Observações || r.Observacoes || r.observacoes || '').toString().trim();
+                                return `<div class=\"language-item\"><div class=\"language-name\">${idioma}</div>${nivel ? `<span class=\\\"language-level\\\">${nivel}</span>` : ''}${obs ? `<div class=\\\"language-obs\\\">${obs.replace(/</g,'&lt;')}</div>` : ''}</div>`;
+                            }).join('')}</div>
+                        ` : `<p style=\"color: #546e7a; margin: 0;\">Sem informação</p>`}
                     </div>
-                </div>
-            `;
-        } catch (e) {
-            console.warn('Falha ao renderizar idiomas:', e?.message || e);
-        }
+                </div>`;
+        } catch {}
 
-        // Card de Experiências Profissionais
         try {
             const exps = getExperienciasForPerson(person) || [];
             const hasExp = exps.length > 0;
-            html += `
+            experienciasCard = `
                 <div class="person-detail">
                     <h3>Experiências Profissionais</h3>
                     <div class="person-detail-content">
                         ${hasExp ? `
-                            <div style="display:flex; flex-direction:column; gap:16px;">
-                                ${exps.map(r => {
-                                    const local = (r.Localidade || r.localidade || '').toString().trim();
-                                    const di = (r.Data_Inicio || r.data_inicio || '').toString().trim();
-                                    const df = (r.Data_Fim || r.data_fim || '').toString().trim();
-                                    const area = (r.Area_Conhecimento || r.area_conhecimento || '').toString().trim();
-                                    const meses = parseInt(r.Meses_Experiencia || r.meses_experiencia || 0, 10);
-                                    const dur = monthsToYearsText(meses);
-                                    const desc = (r.Descricao || r.descricao || '').toString().replace(/</g, '&lt;');
-                                    return `
-                                        <div class="experience-card">
-                                            <div class="experience-header">
-                                                <div>
-                                                    <div class="experience-title">${area || 'Experiência Profissional'}</div>
-                                                    <div class="experience-meta">
-                                                        ${local ? `<div class="experience-meta-item"><strong>📍</strong> ${local}</div>` : ''}
-                                                        ${di && df ? `<div class="experience-meta-item"><strong>📅</strong> ${di} — ${df}</div>` : ''}
-                                                    </div>
-                                                </div>
-                                                ${dur ? `<div class="experience-duration">${dur}</div>` : ''}
-                                            </div>
-                                            ${desc ? `<div class="experience-description">${desc}</div>` : ''}
-                                        </div>
-                                    `;
-                                }).join('')}
-                            </div>
-                        ` : `
-                            <p style="color: #546e7a; margin: 0;">Sem informação</p>
-                        `}
+                            <div style=\"display:flex; flex-direction:column; gap:16px;\">${exps.map(r => {
+                                const local = (r.Localidade || r.localidade || '').toString().trim();
+                                const di = (r.Data_Inicio || r.data_inicio || '').toString().trim();
+                                const df = (r.Data_Fim || r.data_fim || '').toString().trim();
+                                const area = (r.Area_Conhecimento || r.area_conhecimento || '').toString().trim();
+                                const meses = parseInt(r.Meses_Experiencia || r.meses_experiencia || 0, 10);
+                                const dur = monthsToYearsText(meses);
+                                const desc = (r.Descricao || r.descricao || '').toString().replace(/</g, '&lt;');
+                                return `<div class=\"experience-card\"><div class=\"experience-header\"><div><div class=\"experience-title\">${area || 'Experiência Profissional'}</div><div class=\"experience-meta\">${local ? `<div class=\\\"experience-meta-item\\\"><strong>📍</strong> ${local}</div>` : ''}${di && df ? `<div class=\\\"experience-meta-item\\\"><strong>📅</strong> ${di} — ${df}</div>` : ''}</div></div>${dur ? `<div class=\\\"experience-duration\\\">${dur}</div>` : ''}</div>${desc ? `<div class=\\\"experience-description\\\">${desc}</div>` : ''}</div>`;
+                            }).join('')}</div>
+                        ` : `<p style=\"color: #546e7a; margin: 0;\">Sem informação</p>`}
                     </div>
-                </div>
-            `;
-        } catch (e) {
-            console.warn('Falha ao renderizar experiências profissionais:', e?.message || e);
-        }
-
-        // Card de Notas por Competência (Auto x Gestor) e Potencial (somente Gestor)
-        try {
-            const comps = getCompetenciasForPerson(person);
-            if (comps && ((comps.performance && comps.performance.length) || (comps.potencial && comps.potencial.length))) {
-                const renderRow = (c) => {
-                    const autoVal = (c.auto ?? '') !== '' ? Number(c.auto) : null;
-                    const gestorVal = (c.gestor ?? '') !== '' ? Number(c.gestor) : null;
-                    const diff = (autoVal !== null && gestorVal !== null) ? Math.abs(gestorVal - autoVal) : 0;
-                    
-                    // Destaque de diferença: >= 2 (alerta laranja), >= 3 (crítico vermelho)
-                    let diffBadge = '';
-                    let rowHighlight = '';
-                    if (diff >= 3) {
-                        diffBadge = '<span style="display:inline-block; margin-left:6px; padding:2px 6px; background:#d32f2f; color:white; border-radius:4px; font-size:0.75em; font-weight:600;">Δ ' + diff.toFixed(1) + '</span>';
-                        rowHighlight = 'background: linear-gradient(90deg, #ffebee 0%, transparent 100%); border-left: 3px solid #d32f2f;';
-                    } else if (diff >= 2) {
-                        diffBadge = '<span style="display:inline-block; margin-left:6px; padding:2px 6px; background:#f57c00; color:white; border-radius:4px; font-size:0.75em; font-weight:600;">Δ ' + diff.toFixed(1) + '</span>';
-                        rowHighlight = 'background: linear-gradient(90deg, #fff3e0 0%, transparent 100%); border-left: 3px solid #f57c00;';
-                    }
-                    
-                    const autoCell = autoVal !== null 
-                        ? `<div class="nota-cell" data-nota="${autoVal.toFixed(2)}" title="${escapeAttr(c.autoComments || 'Sem comentários')}">${autoVal.toFixed(2)}</div>`
-                        : '<div style="text-align:center; color:#90a4ae;">—</div>';
-                    
-                    const gestorCell = gestorVal !== null 
-                        ? `<div class="nota-cell" data-nota="${gestorVal.toFixed(2)}" title="${escapeAttr(c.gestorComments || 'Sem comentários')}">${gestorVal.toFixed(2)}</div>`
-                        : '<div style="text-align:center; color:#90a4ae;">—</div>';
-                    
-                    return `
-                        <div style="display:grid; grid-template-columns: 1fr 100px 100px; gap:12px; align-items:center; padding:10px 12px; border-bottom: 1px solid #e8eef3; ${rowHighlight}">
-                            <div style="font-weight:600; color:#1a2332; display:flex; align-items:center;">
-                                ${c.competencia}
-                                ${diffBadge}
-                            </div>
-                            ${autoCell}
-                            ${gestorCell}
-                        </div>`;
-                };
-
-                const hasPerf = comps.performance && comps.performance.length > 0;
-                const hasPot = comps.potencial && comps.potencial.length > 0;
-
-                html += `
-                    <div class="person-detail">
-                        <h3>Notas por Competência</h3>
-                        <div class="person-detail-content" style="padding:0;">
-                            ${hasPerf ? `
-                                <div style="margin-bottom:20px;">
-                                    <div style="background:#f5f8fa; padding:12px 16px; border-bottom:2px solid #003797; display:grid; grid-template-columns: 1fr 100px 100px; gap:12px; font-weight:700; color:#1a2332; font-size:0.9em;">
-                                        <div>Competência - Desempenho</div>
-                                        <div style="text-align:center;">Auto</div>
-                                        <div style="text-align:center;">Gestor</div>
-                                    </div>
-                                    ${comps.performance.map(renderRow).join('')}
-                                </div>
-                            ` : ''}
-
-                            ${hasPot ? `
-                                <div>
-                                    <div style="background:#f5f8fa; padding:12px 16px; border-bottom:2px solid #003797; display:grid; grid-template-columns: 1fr 100px 100px; gap:12px; font-weight:700; color:#1a2332; font-size:0.9em;">
-                                        <div>Competência - Potencial <span class="hint" style="margin-left:6px; font-weight:400;">(somente gestor avalia)</span></div>
-                                        <div style="text-align:center;">Auto</div>
-                                        <div style="text-align:center;">Gestor</div>
-                                    </div>
-                    ${comps.potencial.map(c => renderRow({ ...c, auto: null, autoComments: '' })).join('')}
-                                </div>
-                            ` : ''}
-                        </div>
-                    </div>
-                `;
-            }
-        } catch (e) {
-            console.warn('Falha ao renderizar competências:', e?.message || e);
-        }
+                </div>`;
+        } catch {}
     } else {
-        html += `
+        profissionalCard = `
             <div class="no-data-message">
                 <strong>Informações Complementares Não Encontradas</strong>
                 <p style="margin: 10px 0 0 0;">Os dados adicionais deste colaborador não estão disponíveis no cadastro.</p>
-            </div>
-        `;
+            </div>`;
     }
-    
-    // Encerrar a coluna esquerda e abrir a direita
-    html += `
-                </div>
-                <div>
-    `;
 
-    // Card de Desenvolvimento e Sucessão
-    html += await generateDesenvolvimentoCard(nome, empData);
-    
-    // Comparativo de Avaliações (autoavaliação vs gestor)
-    html += generateComparisonCard(nome);
-    
-    // Histórico de Movimentações
+    // 2.2 Comparativo de Avaliações — Sessão 2
+    const comparativoAvaliacoesCard = generateComparisonCard(nome);
+
+    // 2.3 Notas por Competência — Sessão 2
+    let competenciasCard = '';
+    try {
+        const comps = getCompetenciasForPerson(person);
+        if (comps && ((comps.performance && comps.performance.length) || (comps.potencial && comps.potencial.length))) {
+            const renderRow = (c) => {
+                const autoVal = (c.auto ?? '') !== '' ? Number(c.auto) : null;
+                const gestorVal = (c.gestor ?? '') !== '' ? Number(c.gestor) : null;
+                const diff = (autoVal !== null && gestorVal !== null) ? Math.abs(gestorVal - autoVal) : 0;
+                let diffBadge = '';
+                let rowHighlight = '';
+                if (diff >= 3) { diffBadge = '<span style="display:inline-block; margin-left:6px; padding:2px 6px; background:#d32f2f; color:white; border-radius:4px; font-size:0.75em; font-weight:600;">Δ ' + diff.toFixed(1) + '</span>'; rowHighlight = 'background: linear-gradient(90deg, #ffebee 0%, transparent 100%); border-left: 3px solid #d32f2f;'; }
+                else if (diff >= 2) { diffBadge = '<span style="display:inline-block; margin-left:6px; padding:2px 6px; background:#f57c00; color:white; border-radius:4px; font-size:0.75em; font-weight:600;">Δ ' + diff.toFixed(1) + '</span>'; rowHighlight = 'background: linear-gradient(90deg, #fff3e0 0%, transparent 100%); border-left: 3px solid #f57c00;'; }
+                const autoCell = autoVal !== null ? `<div class=\"nota-cell\" data-nota=\"${autoVal.toFixed(2)}\" title=\"${escapeAttr(c.autoComments || 'Sem comentários')}\">${autoVal.toFixed(2)}</div>` : '<div style=\"text-align:center; color:#90a4ae;\">—</div>';
+                const gestorCell = gestorVal !== null ? `<div class=\"nota-cell\" data-nota=\"${gestorVal.toFixed(2)}\" title=\"${escapeAttr(c.gestorComments || 'Sem comentários')}\">${gestorVal.toFixed(2)}</div>` : '<div style=\"text-align:center; color:#90a4ae;\">—</div>';
+                return `<div style=\"display:grid; grid-template-columns: 1fr 100px 100px; gap:12px; align-items:center; padding:10px 12px; border-bottom: 1px solid #e8eef3; ${rowHighlight}\"><div style=\"font-weight:600; color:#1a2332; display:flex; align-items:center;\">${c.competencia}${diffBadge}</div>${autoCell}${gestorCell}</div>`;
+            };
+            const hasPerf = comps.performance && comps.performance.length > 0;
+            const hasPot = comps.potencial && comps.potencial.length > 0;
+            competenciasCard = `
+                <div class="person-detail">
+                    <h3>Notas por Competência</h3>
+                    <div class="person-detail-content" style="padding:0;">
+                        ${hasPerf ? `<div style=\"margin-bottom:20px;\"><div style=\"background:#f5f8fa; padding:12px 16px; border-bottom:2px solid #003797; display:grid; grid-template-columns: 1fr 100px 100px; gap:12px; font-weight:700; color:#1a2332; font-size:0.9em;\"><div>Competência - Desempenho</div><div style=\"text-align:center;\">Auto</div><div style=\"text-align:center;\">Gestor</div></div>${comps.performance.map(renderRow).join('')}</div>` : ''}
+                        ${hasPot ? `<div><div style=\"background:#f5f8fa; padding:12px 16px; border-bottom:2px solid #003797; display:grid; grid-template-columns: 1fr 100px 100px; gap:12px; font-weight:700; color:#1a2332; font-size:0.9em;\"><div>Competência - Potencial <span class=\"hint\" style=\"margin-left:6px; font-weight:400;\">(somente gestor avalia)</span></div><div style=\"text-align:center;\">Auto</div><div style=\"text-align:center;\">Gestor</div></div>${comps.potencial.map(c => renderRow({ ...c, auto: null, autoComments: '' })).join('')}</div>` : ''}
+                    </div>
+                </div>`;
+        }
+    } catch {}
+
+    // 1.5 Histórico de Movimentações — Sessão 1
     const movements = getMovementHistory(nome);
-    if (movements.length > 0) {
-        html += generateMovementTimeline(movements);
-    } else if (movementHistory.length > 0) {
-        html += `
-            <div class="person-detail">
-                <h3>Histórico de Movimentações</h3>
-                <div class="person-detail-content">
-                    <p style="color: #546e7a; text-align: center; margin: 0;">Nenhuma movimentação registrada para este colaborador.</p>
-                </div>
-            </div>
-        `;
-    }
-    
+    let historicoCard = '';
+    if (movements.length > 0) historicoCard = generateMovementTimeline(movements);
+    else if (movementHistory.length > 0) historicoCard = `
+        <div class="person-detail"><h3>Histórico de Movimentações</h3><div class="person-detail-content"><p style="color:#546e7a; text-align:center; margin:0;">Nenhuma movimentação registrada para este colaborador.</p></div></div>`;
+
+    // 3.2 Planejamento e Desenvolvimento de Sucessão — Sessão 3
+    const desenvolvimentoCard = await generateDesenvolvimentoCard(nome, empData);
+
+    // ====== MONTAGEM DAS SESSÕES ======
+    // Sessão 1: Dados pessoais e profissionais
     html += `
+        <div class="section-block">
+            <div class="section-title">Dados pessoais e profissionais</div>
+            <div class="section-content">
+                <div class="detail-grid">
+                    <div>
+                        ${profissionalCard || ''}
+                        ${pessoaisCard || ''}
+                        ${idiomasCard || ''}
+                        ${experienciasCard || ''}
+                    </div>
+                    <div>
+                        ${historicoCard || ''}
+                    </div>
                 </div>
             </div>
-        </div>`; // Fecha detail-grid + shell
-    
+        </div>`;
+
+    // Sessão 2: Avaliação de desempenho
+    html += `
+        <div class="section-block">
+            <div class="section-title">Avaliação de desempenho</div>
+            <div class="section-content">
+                <div class="detail-grid">
+                    <div>
+                        ${comparison2024Card || ''}
+                        ${comparativoAvaliacoesCard || ''}
+                    </div>
+                    <div>
+                        ${competenciasCard || ''}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+    // Sessão 3: Comitê de Calibração (editáveis)
+    html += `
+        <div class="section-block">
+            <div class="section-title">Comitê de Calibração</div>
+            <div class="section-content">
+                <div class="detail-grid">
+                    <div>
+                        ${perfEditableCard}
+                    </div>
+                    <div>
+                        ${desenvolvimentoCard}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`; // fecha detail-shell
+
     document.getElementById('modalContent').innerHTML = html;
     openModal();
 }
@@ -2900,6 +2793,52 @@ async function generateDesenvolvimentoCard(nome, empData) {
                 <form id="form-desenvolvimento" onsubmit="return false;" style="display: grid; gap: 16px;">
                     <datalist id="funcionarios-list">${datalistOptions}</datalist>
 
+                    <!-- Comentários gerais no topo da sessão (id preservado) -->
+                    <div class="form-row dev-general-comments">
+                        <label>Comentários gerais</label>
+                        <textarea id="dev-comentarios" rows="3" placeholder="Observações gerais sobre o desenvolvimento do colaborador...">${dev && dev.comentarios ? dev.comentarios : ''}</textarea>
+                        
+                    </div>
+
+                    <!-- Grupo destacado: Aptidão / Risco / Impacto / Pessoa chave -->
+                    <div class="dev-feature-group">
+                        <div class="dev-feature-item">
+                            <div class="dev-feature-label">Aptidão de carreira</div>
+                            <select id="dev-aptidao" class="dev-feature-select">
+                                <option value="">Selecione...</option>
+                                <option value="Liderança" ${dev && dev.aptidao_carreira === 'Liderança' ? 'selected' : ''}>Liderança</option>
+                                <option value="Gestão" ${dev && dev.aptidao_carreira === 'Gestão' ? 'selected' : ''}>Gestão</option>
+                                <option value="Técnico" ${dev && dev.aptidao_carreira === 'Técnico' ? 'selected' : ''}>Técnico</option>
+                            </select>
+                        </div>
+                        <div class="dev-feature-item">
+                            <div class="dev-feature-label">Risco de saída</div>
+                            <select id="dev-risco" class="dev-feature-select">
+                                <option value="">Selecione...</option>
+                                <option value="Alto" ${dev && dev.risco_saida === 'Alto' ? 'selected' : ''}>Alto</option>
+                                <option value="Médio" ${dev && dev.risco_saida === 'Médio' ? 'selected' : ''}>Médio</option>
+                                <option value="Baixo" ${dev && dev.risco_saida === 'Baixo' ? 'selected' : ''}>Baixo</option>
+                            </select>
+                        </div>
+                        <div class="dev-feature-item">
+                            <div class="dev-feature-label">Impacto de saída</div>
+                            <select id="dev-impacto" class="dev-feature-select">
+                                <option value="">Selecione...</option>
+                                <option value="Alto" ${dev && dev.impacto_saida === 'Alto' ? 'selected' : ''}>Alto</option>
+                                <option value="Médio" ${dev && dev.impacto_saida === 'Médio' ? 'selected' : ''}>Médio</option>
+                                <option value="Baixo" ${dev && dev.impacto_saida === 'Baixo' ? 'selected' : ''}>Baixo</option>
+                            </select>
+                        </div>
+                        <div class="dev-feature-item">
+                            <div class="dev-feature-label">Pessoa chave/Técnica</div>
+                            <select id="dev-chave" class="dev-feature-select">
+                                <option value="">Selecione...</option>
+                                <option value="Sim" ${dev && dev.pessoa_chave_tecnica === 'Sim' ? 'selected' : ''}>Sim</option>
+                                <option value="Não" ${dev && dev.pessoa_chave_tecnica === 'Não' ? 'selected' : ''}>Não</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="dev-section" id="dev-sec-1">
                         <div class="section-header" onclick="toggleSection('dev-sec-1')">
                             <span>Pessoa 1 (Opcional)</span>
@@ -2990,48 +2929,7 @@ async function generateDesenvolvimentoCard(nome, empData) {
                         </div>
                     </div>
 
-                    <div class="form-grid-2col">
-                        <div class="form-row">
-                            <label>Aptidão de carreira</label>
-                            <select id="dev-aptidao">
-                                <option value="">Selecione...</option>
-                                <option value="Liderança" ${dev && dev.aptidao_carreira === 'Liderança' ? 'selected' : ''}>Liderança</option>
-                                <option value="Gestão" ${dev && dev.aptidao_carreira === 'Gestão' ? 'selected' : ''}>Gestão</option>
-                                <option value="Técnico" ${dev && dev.aptidao_carreira === 'Técnico' ? 'selected' : ''}>Técnico</option>
-                            </select>
-                        </div>
-                        <div class="form-row">
-                            <label>Risco de saída</label>
-                            <select id="dev-risco">
-                                <option value="">Selecione...</option>
-                                <option value="Alto" ${dev && dev.risco_saida === 'Alto' ? 'selected' : ''}>Alto</option>
-                                <option value="Médio" ${dev && dev.risco_saida === 'Médio' ? 'selected' : ''}>Médio</option>
-                                <option value="Baixo" ${dev && dev.risco_saida === 'Baixo' ? 'selected' : ''}>Baixo</option>
-                            </select>
-                        </div>
-                        <div class="form-row">
-                            <label>Impacto de saída</label>
-                            <select id="dev-impacto">
-                                <option value="">Selecione...</option>
-                                <option value="Alto" ${dev && dev.impacto_saida === 'Alto' ? 'selected' : ''}>Alto</option>
-                                <option value="Médio" ${dev && dev.impacto_saida === 'Médio' ? 'selected' : ''}>Médio</option>
-                                <option value="Baixo" ${dev && dev.impacto_saida === 'Baixo' ? 'selected' : ''}>Baixo</option>
-                            </select>
-                        </div>
-                        <div class="form-row">
-                            <label>Pessoa chave/Técnica</label>
-                            <select id="dev-chave">
-                                <option value="">Selecione...</option>
-                                <option value="Sim" ${dev && dev.pessoa_chave_tecnica === 'Sim' ? 'selected' : ''}>Sim</option>
-                                <option value="Não" ${dev && dev.pessoa_chave_tecnica === 'Não' ? 'selected' : ''}>Não</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <label>Comentários adicionais</label>
-                        <textarea id="dev-comentarios" rows="3" placeholder="Observações sobre o desenvolvimento do colaborador...">${dev && dev.comentarios ? dev.comentarios : ''}</textarea>
-                    </div>
+                    
 
                     <div class="dev-footer-actions">
                         <div id="dev-status" style="display:none;"></div>
