@@ -3784,5 +3784,214 @@ function exportModifiedCSV() {
     showNotification('success', 'CSV exportado', `Arquivo exportado com sucesso! ${changedCount} colaborador(es) com posições modificadas.`);
 }
 
+// ===== FILTRO RESTRITO (GERÊNCIA GP) =====
+let restrictedFilterActive = false;
+const RESTRICTED_PASSWORD = '@GerenciaGP';
+const RESTRICTED_AREAS = [
+    '001.03.01.1001.02 - COORDENAÇÃO DE COMUNICAÇÃO E MARKETING',
+    '001.03.01.1001.00 - DIRETORIA DE GESTÃO DE PESSOAS E COMUNICAÇÃO',
+    '001.03.01.1001.01 - COORDENAÇÃO DE GESTÃO DE PESSOAS'
+];
+
+function toggleRestrictedFilterModal() {
+    const modal = document.getElementById('restrictedFilterModal');
+    if (modal) {
+        modal.style.display = modal.style.display === 'none' ? 'flex' : 'none';
+        updateRestrictedFilterUI();
+    }
+}
+
+function closeRestrictedFilterModal() {
+    const modal = document.getElementById('restrictedFilterModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    // Limpar senha digitada
+    const passInput = document.getElementById('restrictedPassword');
+    if (passInput) passInput.value = '';
+}
+
+function applyRestrictedFilter() {
+    const passInput = document.getElementById('restrictedPassword');
+    const statusEl = document.getElementById('restrictedFilterStatus');
+    
+    if (!passInput || !statusEl) return;
+    
+    const password = passInput.value;
+    
+    if (password === RESTRICTED_PASSWORD) {
+        restrictedFilterActive = true;
+        statusEl.textContent = 'Filtro ativado com sucesso!';
+        statusEl.className = 'restricted-status success';
+        
+        // Aplicar filtro restrito
+        applyRestrictedAreaFilter();
+        updateRestrictedFilterUI();
+        
+        // Fechar modal após 1 segundo
+        setTimeout(() => {
+            closeRestrictedFilterModal();
+        }, 1000);
+    } else {
+        statusEl.textContent = 'Senha incorreta!';
+        statusEl.className = 'restricted-status error';
+    }
+}
+
+function removeRestrictedFilter() {
+    restrictedFilterActive = false;
+    const statusEl = document.getElementById('restrictedFilterStatus');
+    if (statusEl) {
+        statusEl.textContent = 'Filtro removido.';
+        statusEl.className = 'restricted-status';
+    }
+    
+    updateRestrictedFilterUI();
+    clearFilters();
+    
+    setTimeout(() => {
+        closeRestrictedFilterModal();
+    }, 500);
+}
+
+function applyRestrictedAreaFilter() {
+    // Filtrar apenas as áreas permitidas
+    filteredData = allData.filter(person => {
+        const area = person['Área'] || '';
+        return RESTRICTED_AREAS.some(allowedArea => area.includes(allowedArea) || allowedArea.includes(area));
+    });
+    
+    console.log(`Filtro restrito aplicado: ${filteredData.length} registros das áreas GP/Comunicação`);
+    
+    updateNineBox();
+    updateDashboard();
+}
+
+function updateRestrictedFilterUI() {
+    const toggle = document.getElementById('restrictedFilterToggle');
+    const removeBtn = document.getElementById('removeRestrictedBtn');
+    
+    if (toggle) {
+        if (restrictedFilterActive) {
+            toggle.classList.add('active');
+            toggle.innerHTML = '<span class="lock-icon">🔓</span>';
+            toggle.title = 'Filtro restrito ativo';
+        } else {
+            toggle.classList.remove('active');
+            toggle.innerHTML = '<span class="lock-icon">🔒</span>';
+            toggle.title = 'Acesso restrito';
+        }
+    }
+    
+    if (removeBtn) {
+        removeBtn.style.display = restrictedFilterActive ? 'block' : 'none';
+    }
+}
+
+// Override do clearFilters para respeitar o filtro restrito
+const originalClearFilters = typeof clearFilters === 'function' ? clearFilters : null;
+clearFilters = function() {
+    document.getElementById('filterArea').value = '';
+    document.getElementById('filterForm').value = '';
+    document.getElementById('filterName').value = '';
+    
+    if (document.getElementById('filterDiretoria')) {
+        document.getElementById('filterDiretoria').value = '';
+    }
+    if (document.getElementById('filterGerencia')) {
+        document.getElementById('filterGerencia').value = '';
+    }
+    if (document.getElementById('filterGrupoCargo')) {
+        document.getElementById('filterGrupoCargo').value = '';
+    }
+    if (document.getElementById('filterMesa')) {
+        document.getElementById('filterMesa').value = '';
+    }
+    if (document.getElementById('filterGestor')) {
+        document.getElementById('filterGestor').value = '';
+    }
+    
+    // Se filtro restrito estiver ativo, aplicar ele ao invés de mostrar tudo
+    if (restrictedFilterActive) {
+        applyRestrictedAreaFilter();
+    } else {
+        filteredData = [...allData];
+        updateNineBox();
+        updateDashboard();
+    }
+};
+
+// Override do applyFilters para respeitar o filtro restrito
+const originalApplyFilters = typeof applyFilters === 'function' ? applyFilters : null;
+applyFilters = function() {
+    const areaFilter = document.getElementById('filterArea').value;
+    const formFilter = document.getElementById('filterForm').value;
+    const nameFilter = document.getElementById('filterName').value.toLowerCase();
+    const diretoriaFilter = document.getElementById('filterDiretoria')?.value || '';
+    const gerenciaFilter = document.getElementById('filterGerencia')?.value || '';
+    const grupoCargoFilter = document.getElementById('filterGrupoCargo')?.value || '';
+    const mesaFilter = document.getElementById('filterMesa')?.value || '';
+    const gestorFilter = document.getElementById('filterGestor')?.value || '';
+    
+    // Começar com dados base (filtro restrito ou todos)
+    let baseData = restrictedFilterActive 
+        ? allData.filter(person => {
+            const area = person['Área'] || '';
+            return RESTRICTED_AREAS.some(allowedArea => area.includes(allowedArea) || allowedArea.includes(area));
+        })
+        : allData;
+    
+    filteredData = baseData.filter(person => {
+        const matchArea = !areaFilter || person['Área'] === areaFilter;
+        const matchForm = !formFilter || person['Formulário'] === formFilter;
+        const matchName = !nameFilter || 
+            (person['Usuário Avaliado'] || person['Avaliado'] || '').toLowerCase().includes(nameFilter);
+        
+        // Filtros de funcionário
+        let matchDiretoria = true;
+        let matchGerencia = true;
+        let matchGrupoCargo = true;
+        
+        if (diretoriaFilter || gerenciaFilter || grupoCargoFilter) {
+            const empData = getEmployeeByName(person['Usuário Avaliado'] || person['Avaliado']);
+            if (empData) {
+                matchDiretoria = !diretoriaFilter || empData['DIRETORIA'] === diretoriaFilter;
+                matchGerencia = !gerenciaFilter || empData['GERENCIA'] === gerenciaFilter;
+                matchGrupoCargo = !grupoCargoFilter || empData['GRUPO DE CARGO'] === grupoCargoFilter;
+            } else {
+                if (diretoriaFilter || gerenciaFilter || grupoCargoFilter) {
+                    return false;
+                }
+            }
+        }
+        
+        // Filtro por mesa de calibração
+        let matchMesa = true;
+        if (mesaFilter) {
+            const mesa = getMesaByName(person['Usuário Avaliado'] || person['Avaliado']);
+            matchMesa = mesa ? `${mesa.mesa}` === `${mesaFilter}` : false;
+        }
+
+        // Filtro por gestor
+        let matchGestor = true;
+        if (gestorFilter) {
+            const pessoaAvaliada = getGestorByName(person['Usuário Avaliado'] || person['Avaliado']);
+            if (pessoaAvaliada && pessoaAvaliada.gestor) {
+                const norm = (s)=> (s||'').toString().trim().toUpperCase();
+                matchGestor = norm(pessoaAvaliada.gestor) === norm(gestorFilter);
+            } else {
+                matchGestor = false;
+            }
+        }
+
+        return matchArea && matchForm && matchName && matchDiretoria && matchGerencia && matchGrupoCargo && matchMesa && matchGestor;
+    });
+    
+    console.log(`${filteredData.length} registros após filtros${restrictedFilterActive ? ' (filtro restrito ativo)' : ''}`);
+    
+    updateNineBox();
+    updateDashboard();
+};
+
 // Mensagem inicial
 console.log('Nine Box App carregado. Faça upload do arquivo CSV para começar.');

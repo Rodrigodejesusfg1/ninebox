@@ -91,6 +91,25 @@
                     <button class="btn btn-primary" onclick="applyFilters()">Filtrar</button>
                     <button class="btn btn-secondary" onclick="clearFilters()">Limpar Filtros</button>
                 </div>
+                <!-- Filtro restrito (discreto) -->
+                <div class="restricted-filter-toggle" id="restrictedFilterToggle" onclick="toggleRestrictedFilterModal()" title="Acesso restrito">
+                    <span class="lock-icon">🔒</span>
+                </div>
+            </div>
+
+            <!-- Modal de filtro restrito -->
+            <div id="restrictedFilterModal" class="restricted-modal" style="display: none;">
+                <div class="restricted-modal-content">
+                    <button class="restricted-modal-close" onclick="closeRestrictedFilterModal()">&times;</button>
+                    <h4>Acesso Restrito</h4>
+                    <p>Digite a senha para acessar a visualização da Gerência GP:</p>
+                    <input type="password" id="restrictedPassword" placeholder="Senha" onkeypress="if(event.key==='Enter')applyRestrictedFilter()">
+                    <div class="restricted-btn-group">
+                        <button class="btn btn-primary" onclick="applyRestrictedFilter()">Acessar</button>
+                        <button class="btn btn-secondary" onclick="removeRestrictedFilter()" id="removeRestrictedBtn" style="display:none;">Remover Filtro</button>
+                    </div>
+                    <p id="restrictedFilterStatus" class="restricted-status"></p>
+                </div>
             </div>
 
                 <!-- Controles de mudanças manuais -->
