@@ -434,11 +434,18 @@ async function loadDataFromSupabase() {
         // IMPORTANTE: Inicializar os dados filtrados
         filteredData = [...allData];
         
-        // Renderizar o NineBox automaticamente com os dados carregados
-        updateLoader('Renderizando NineBox...');
-        console.log('🎨 Renderizando NineBox...');
-        updateNineBox();
-        updateDashboard();
+        // Verificar se há filtro restrito salvo na sessão e aplicá-lo
+        if (loadRestrictedFilterState()) {
+            console.log('🔒 Reaplicando filtro restrito após carregamento de dados...');
+            applyRestrictedAreaFilter();
+            updateRestrictedFilterUI();
+        } else {
+            // Renderizar o NineBox automaticamente com os dados carregados
+            updateLoader('Renderizando NineBox...');
+            console.log('🎨 Renderizando NineBox...');
+            updateNineBox();
+            updateDashboard();
+        }
         
         console.log('✅ Dados carregados e NineBox renderizado!');
         console.log(`📊 Total: ${allData.length} avaliações | ${employeeData.length} funcionários`);
@@ -3788,6 +3795,61 @@ function exportModifiedCSV() {
 let restrictedFilterActive = false;
 let RESTRICTED_AREAS = []; // Será preenchido pela API após validação
 
+// Persistência do filtro restrito no sessionStorage
+function saveRestrictedFilterState() {
+    try {
+        sessionStorage.setItem('restrictedFilterActive', restrictedFilterActive ? 'true' : 'false');
+        sessionStorage.setItem('restrictedAreas', JSON.stringify(RESTRICTED_AREAS));
+    } catch (e) {
+        console.warn('Não foi possível salvar estado do filtro restrito:', e);
+    }
+}
+
+function loadRestrictedFilterState() {
+    try {
+        const active = sessionStorage.getItem('restrictedFilterActive');
+        const areas = sessionStorage.getItem('restrictedAreas');
+        if (active === 'true' && areas) {
+            restrictedFilterActive = true;
+            RESTRICTED_AREAS = JSON.parse(areas);
+            console.log('🔒 Filtro restrito restaurado da sessão:', RESTRICTED_AREAS.length, 'áreas');
+            return true;
+        }
+    } catch (e) {
+        console.warn('Não foi possível carregar estado do filtro restrito:', e);
+    }
+    return false;
+}
+
+// Normaliza texto para comparação (remove acentos, espaços extras, lowercase)
+function normalizeAreaText(str) {
+    if (!str) return '';
+    return str.toString()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+// Verifica se uma área está na lista de áreas permitidas
+function isAreaAllowed(personArea) {
+    if (!personArea || RESTRICTED_AREAS.length === 0) return false;
+    const normalizedPersonArea = normalizeAreaText(personArea);
+    
+    return RESTRICTED_AREAS.some(allowedArea => {
+        const normalizedAllowed = normalizeAreaText(allowedArea);
+        // Verifica se contém o código da área (ex: 001.03.01.1001.02)
+        const codeMatch = normalizedAllowed.match(/^([\d.]+)/);
+        if (codeMatch) {
+            const code = codeMatch[1];
+            if (normalizedPersonArea.includes(code)) return true;
+        }
+        // Fallback: comparação por inclusão
+        return normalizedPersonArea.includes(normalizedAllowed) || 
+               normalizedAllowed.includes(normalizedPersonArea);
+    });
+}
+
 function toggleRestrictedFilterModal() {
     const modal = document.getElementById('restrictedFilterModal');
     if (modal) {
@@ -3848,8 +3910,11 @@ async function applyRestrictedFilter() {
         if (result.valido) {
             restrictedFilterActive = true;
             RESTRICTED_AREAS = result.areas || [];
+            saveRestrictedFilterState(); // Persistir estado
             statusEl.textContent = 'Filtro ativado com sucesso!';
             statusEl.className = 'restricted-status success';
+            
+            console.log('🔒 Filtro GP ativado. Áreas permitidas:', RESTRICTED_AREAS);
             
             // Aplicar filtro restrito
             applyRestrictedAreaFilter();
@@ -3873,14 +3938,22 @@ async function applyRestrictedFilter() {
 function removeRestrictedFilter() {
     restrictedFilterActive = false;
     RESTRICTED_AREAS = []; // Limpar áreas
+    saveRestrictedFilterState(); // Persistir estado (limpo)
+    
     const statusEl = document.getElementById('restrictedFilterStatus');
     if (statusEl) {
         statusEl.textContent = 'Filtro removido.';
         statusEl.className = 'restricted-status';
     }
     
+    console.log('🔓 Filtro GP removido');
+    
     updateRestrictedFilterUI();
-    clearFilters();
+    
+    // Recarregar todos os dados sem filtro restrito
+    filteredData = [...allData];
+    updateNineBox();
+    updateDashboard();
     
     setTimeout(() => {
         closeRestrictedFilterModal();
@@ -3888,13 +3961,13 @@ function removeRestrictedFilter() {
 }
 
 function applyRestrictedAreaFilter() {
-    // Filtrar apenas as áreas permitidas
+    // Filtrar apenas as áreas permitidas usando comparação normalizada
     filteredData = allData.filter(person => {
         const area = person['Área'] || '';
-        return RESTRICTED_AREAS.some(allowedArea => area.includes(allowedArea) || allowedArea.includes(area));
+        return isAreaAllowed(area);
     });
     
-    console.log(`Filtro restrito aplicado: ${filteredData.length} registros das áreas GP/Comunicação`);
+    console.log(`🔒 Filtro restrito aplicado: ${filteredData.length} de ${allData.length} registros (áreas GP/Comunicação)`);
     
     updateNineBox();
     updateDashboard();
@@ -3974,7 +4047,7 @@ applyFilters = function() {
     let baseData = restrictedFilterActive 
         ? allData.filter(person => {
             const area = person['Área'] || '';
-            return RESTRICTED_AREAS.some(allowedArea => area.includes(allowedArea) || allowedArea.includes(area));
+            return isAreaAllowed(area);
         })
         : allData;
     
