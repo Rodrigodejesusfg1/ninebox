@@ -3831,23 +3831,48 @@ function normalizeAreaText(str) {
         .trim();
 }
 
+// Extrai o código numérico da área (ex: "001.03.01.1001.02")
+function extractAreaCode(areaStr) {
+    if (!areaStr) return null;
+    // Procura por padrões como 001.03.01.1001.02 ou similares
+    const match = areaStr.match(/(\d{3}(?:\.\d{2}){2,}\.\d+(?:\.\d+)?)/)
+        || areaStr.match(/(\d+\.\d+\.\d+\.\d+(?:\.\d+)?)/); // fallback mais flexível
+    return match ? match[1] : null;
+}
+
 // Verifica se uma área está na lista de áreas permitidas
 function isAreaAllowed(personArea) {
     if (!personArea || RESTRICTED_AREAS.length === 0) return false;
+    
+    const personAreaCode = extractAreaCode(personArea);
     const normalizedPersonArea = normalizeAreaText(personArea);
     
-    return RESTRICTED_AREAS.some(allowedArea => {
-        const normalizedAllowed = normalizeAreaText(allowedArea);
-        // Verifica se contém o código da área (ex: 001.03.01.1001.02)
-        const codeMatch = normalizedAllowed.match(/^([\d.]+)/);
-        if (codeMatch) {
-            const code = codeMatch[1];
-            if (normalizedPersonArea.includes(code)) return true;
+    for (const allowedArea of RESTRICTED_AREAS) {
+        const allowedCode = extractAreaCode(allowedArea);
+        
+        // Comparação por código numérico (mais precisa)
+        if (personAreaCode && allowedCode) {
+            if (personAreaCode === allowedCode) {
+                return true;
+            }
         }
-        // Fallback: comparação por inclusão
-        return normalizedPersonArea.includes(normalizedAllowed) || 
-               normalizedAllowed.includes(normalizedPersonArea);
-    });
+        
+        // Fallback: comparação por texto normalizado
+        const normalizedAllowed = normalizeAreaText(allowedArea);
+        if (normalizedPersonArea === normalizedAllowed) {
+            return true;
+        }
+        
+        // Comparação parcial (se um contém o código do outro)
+        if (allowedCode && normalizedPersonArea.includes(allowedCode)) {
+            return true;
+        }
+        if (personAreaCode && normalizedAllowed.includes(personAreaCode)) {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 function toggleRestrictedFilterModal() {
@@ -3961,13 +3986,34 @@ function removeRestrictedFilter() {
 }
 
 function applyRestrictedAreaFilter() {
+    // Debug: mostrar todas as áreas únicas nos dados
+    const todasAreas = [...new Set(allData.map(p => p['Área']).filter(Boolean))];
+    console.log('📋 Todas as áreas nos dados:', todasAreas.slice(0, 20), '... total:', todasAreas.length);
+    console.log('🎯 Áreas permitidas:', RESTRICTED_AREAS);
+    
+    // Mostrar códigos extraídos para debug
+    RESTRICTED_AREAS.forEach(a => {
+        console.log(`  - Permitida: "${a}" -> código: ${extractAreaCode(a)}`);
+    });
+    
+    const areasEncontradas = new Set();
+    const areasBloqueadas = new Set();
+    
     // Filtrar apenas as áreas permitidas usando comparação normalizada
     filteredData = allData.filter(person => {
         const area = person['Área'] || '';
-        return isAreaAllowed(area);
+        const allowed = isAreaAllowed(area);
+        if (allowed) {
+            areasEncontradas.add(area);
+        } else if (area) {
+            areasBloqueadas.add(area);
+        }
+        return allowed;
     });
     
-    console.log(`🔒 Filtro restrito aplicado: ${filteredData.length} de ${allData.length} registros (áreas GP/Comunicação)`);
+    console.log('✅ Áreas encontradas (permitidas):', [...areasEncontradas]);
+    console.log('❌ Áreas bloqueadas:', [...areasBloqueadas].slice(0, 10), '... total:', areasBloqueadas.size);
+    console.log(`🔒 Filtro restrito aplicado: ${filteredData.length} de ${allData.length} registros`);
     
     updateNineBox();
     updateDashboard();
