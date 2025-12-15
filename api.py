@@ -906,17 +906,27 @@ async def validar_filtro_gp(request: FiltroGPRequest):
         validate_supabase()
         logger.info("Tentativa de validação do filtro GP...")
         
-        # Buscar senha na tabela filtrogp
+        # Buscar senha na tabela filtrogp (tolerante a espaços e case-insensitive)
         resp = (
             supabase
             .table("filtrogp")
             .select("senha")
-            .eq("senha", request.senha)
-            .limit(1)
+            .limit(10)
             .execute()
         )
+
+        def _norm(value: str) -> str:
+            return (value or "").strip().lower()
+
+        senha_req = _norm(request.senha)
+        senha_match = False
+        if resp.data:
+            for row in resp.data:
+                if _norm(row.get("senha")) == senha_req:
+                    senha_match = True
+                    break
         
-        if resp.data and len(resp.data) > 0:
+        if senha_match:
             logger.info("Filtro GP: Senha validada com sucesso")
             # Áreas permitidas quando a senha está correta
             areas_permitidas = [
