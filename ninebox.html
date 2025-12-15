@@ -91,10 +91,13 @@
                     <button class="btn btn-primary" onclick="applyFilters()">Filtrar</button>
                     <button class="btn btn-secondary" onclick="clearFilters()">Limpar Filtros</button>
                 </div>
-                <!-- Filtro restrito (discreto) -->
-                <div class="restricted-filter-toggle" id="restrictedFilterToggle" onclick="toggleRestrictedFilterModal()" title="Acesso restrito">
-                    <span class="lock-icon">🔒</span>
-                </div>
+
+                <!-- Filtro restrito (botão estilo ghost) -->
+                <button class="btn-ghost restricted-ghost" id="restrictedFilterToggle" onclick="toggleRestrictedFilterModal()" title="Acesso restrito" type="button">
+                    <span class="restricted-lock">🔒</span>
+                    <span class="restricted-text">Acesso restrito</span>
+                    <span class="restricted-badge" id="restrictedCardStatus">Inativo</span>
+                </button>
             </div>
 
             <!-- Modal de filtro restrito -->

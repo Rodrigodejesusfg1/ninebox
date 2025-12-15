@@ -3903,16 +3903,20 @@ function applyRestrictedAreaFilter() {
 function updateRestrictedFilterUI() {
     const toggle = document.getElementById('restrictedFilterToggle');
     const removeBtn = document.getElementById('removeRestrictedBtn');
+    const cardStatus = document.getElementById('restrictedCardStatus');
+    const cardIcon = toggle ? toggle.querySelector('.restricted-lock') : null;
     
     if (toggle) {
         if (restrictedFilterActive) {
             toggle.classList.add('active');
-            toggle.innerHTML = '<span class="lock-icon">🔓</span>';
             toggle.title = 'Filtro restrito ativo';
+            if (cardIcon) cardIcon.textContent = '🔓';
+            if (cardStatus) cardStatus.textContent = 'Ativo';
         } else {
             toggle.classList.remove('active');
-            toggle.innerHTML = '<span class="lock-icon">🔒</span>';
             toggle.title = 'Acesso restrito';
+            if (cardIcon) cardIcon.textContent = '🔒';
+            if (cardStatus) cardStatus.textContent = 'Inativo';
         }
     }
     

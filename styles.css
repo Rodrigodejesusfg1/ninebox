@@ -1,27 +1,35 @@
-/* Filtro restrito (discreto) */
-.restricted-filter-toggle {
-    position: absolute;
-    bottom: 8px;
-    right: 8px;
-    width: 24px;
-    height: 24px;
-    display: flex;
+/* Filtro restrito (botão ghost) */
+.restricted-ghost {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    opacity: 0.3;
-    transition: opacity 0.3s ease;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #dfe3eb;
+    color: #003797;
+    background: transparent;
+}
+.restricted-ghost:hover {
+    background: #f5f7fa;
+}
+.restricted-ghost.active {
+    border-color: #27AE60;
+    color: #1d7a3b;
+    background: #f4fbf6;
+}
+.restricted-lock {
+    font-size: 14px;
+}
+.restricted-badge {
     font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    background: #e8edf5;
+    color: #546e7a;
 }
-.restricted-filter-toggle:hover {
-    opacity: 0.7;
-}
-.restricted-filter-toggle.active {
-    opacity: 1;
-    color: #27AE60;
-}
-.filter-section {
-    position: relative;
+.restricted-ghost.active .restricted-badge {
+    background: #dff4e7;
+    color: #1d7a3b;
 }
 .restricted-modal {
     position: fixed;
