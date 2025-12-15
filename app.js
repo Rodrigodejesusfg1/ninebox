@@ -3793,7 +3793,13 @@ function exportModifiedCSV() {
 
 // ===== FILTRO RESTRITO (GERÊNCIA GP) =====
 let restrictedFilterActive = false;
-let RESTRICTED_AREAS = []; // Será preenchido pela API após validação
+// Áreas que devem ser ocultadas por padrão (requerem senha)
+const KNOWN_RESTRICTED_AREAS = [
+    "001.03.01.1001.02 - COORDENAÇÃO DE COMUNICAÇÃO E MARKETING",
+    "001.03.01.1001.00 - DIRETORIA DE GESTÃO DE PESSOAS E COMUNICAÇÃO",
+    "001.03.01.1001.01 - COORDENAÇÃO DE GESTÃO DE PESSOAS"
+];
+let RESTRICTED_AREAS = [...KNOWN_RESTRICTED_AREAS];
 
 // Persistência do filtro restrito no sessionStorage
 function saveRestrictedFilterState() {
@@ -3840,39 +3846,42 @@ function extractAreaCode(areaStr) {
     return match ? match[1] : null;
 }
 
-// Verifica se uma área está na lista de áreas permitidas
+// Verifica se uma área deve ser exibida (baseado no filtro de restrição)
 function isAreaAllowed(personArea) {
-    if (!personArea || RESTRICTED_AREAS.length === 0) return false;
+    // Se o filtro estiver ativo (senha validada), mostra tudo (incluindo as restritas)
+    if (restrictedFilterActive) return true;
     
+    // Se não tem área definida, mostra por padrão
+    if (!personArea) return true;
+    
+    // Se o filtro NÃO estiver ativo, esconde as áreas restritas
+    // Verifica se a área da pessoa está na lista de restritas
     const personAreaCode = extractAreaCode(personArea);
     const normalizedPersonArea = normalizeAreaText(personArea);
     
-    for (const allowedArea of RESTRICTED_AREAS) {
-        const allowedCode = extractAreaCode(allowedArea);
+    for (const restrictedArea of RESTRICTED_AREAS) {
+        const restrictedCode = extractAreaCode(restrictedArea);
         
-        // Comparação por código numérico (mais precisa)
-        if (personAreaCode && allowedCode) {
-            if (personAreaCode === allowedCode) {
-                return true;
-            }
+        // Comparação por código numérico
+        if (personAreaCode && restrictedCode) {
+            if (personAreaCode === restrictedCode) return false; // Esconde
+            if (personAreaCode.startsWith(restrictedCode) || restrictedCode.startsWith(personAreaCode)) return false; // Esconde
         }
         
-        // Fallback: comparação por texto normalizado
-        const normalizedAllowed = normalizeAreaText(allowedArea);
-        if (normalizedPersonArea === normalizedAllowed) {
-            return true;
-        }
+        // Comparação por texto
+        const normalizedRestricted = normalizeAreaText(restrictedArea);
+        if (normalizedPersonArea === normalizedRestricted) return false; // Esconde
         
-        // Comparação parcial (se um contém o código do outro)
-        if (allowedCode && normalizedPersonArea.includes(allowedCode)) {
-            return true;
-        }
-        if (personAreaCode && normalizedAllowed.includes(personAreaCode)) {
-            return true;
+        // Comparação parcial
+        if (restrictedCode && normalizedPersonArea.includes(restrictedCode)) return false;
+        if (personAreaCode && normalizedRestricted.includes(personAreaCode)) return false;
+        
+        if (normalizedPersonArea.length > 10 && normalizedRestricted.length > 10) {
+            if (normalizedPersonArea.includes(normalizedRestricted) || normalizedRestricted.includes(normalizedPersonArea)) return false;
         }
     }
     
-    return false;
+    return true; // Se não encontrou match nas restritas, mostra
 }
 
 function toggleRestrictedFilterModal() {
@@ -3962,8 +3971,8 @@ async function applyRestrictedFilter() {
 
 function removeRestrictedFilter() {
     restrictedFilterActive = false;
-    RESTRICTED_AREAS = []; // Limpar áreas
-    saveRestrictedFilterState(); // Persistir estado (limpo)
+    RESTRICTED_AREAS = [...KNOWN_RESTRICTED_AREAS]; // Restaurar áreas restritas padrão
+    saveRestrictedFilterState(); // Persistir estado
     
     const statusEl = document.getElementById('restrictedFilterStatus');
     if (statusEl) {
@@ -3971,14 +3980,12 @@ function removeRestrictedFilter() {
         statusEl.className = 'restricted-status';
     }
     
-    console.log('🔓 Filtro GP removido');
+    console.log('🔒 Filtro GP desativado (áreas restritas ocultas)');
     
     updateRestrictedFilterUI();
     
-    // Recarregar todos os dados sem filtro restrito
-    filteredData = [...allData];
-    updateNineBox();
-    updateDashboard();
+    // Reaplicar filtros (agora escondendo as áreas restritas)
+    applyFilters();
     
     setTimeout(() => {
         closeRestrictedFilterModal();
@@ -3986,37 +3993,12 @@ function removeRestrictedFilter() {
 }
 
 function applyRestrictedAreaFilter() {
-    // Debug: mostrar todas as áreas únicas nos dados
-    const todasAreas = [...new Set(allData.map(p => p['Área']).filter(Boolean))];
-    console.log('📋 Todas as áreas nos dados:', todasAreas.slice(0, 20), '... total:', todasAreas.length);
-    console.log('🎯 Áreas permitidas:', RESTRICTED_AREAS);
+    console.log('🔄 Reaplicando filtros com status restrito:', restrictedFilterActive);
     
-    // Mostrar códigos extraídos para debug
-    RESTRICTED_AREAS.forEach(a => {
-        console.log(`  - Permitida: "${a}" -> código: ${extractAreaCode(a)}`);
-    });
+    // Reaplicar todos os filtros (o isAreaAllowed vai cuidar da visibilidade)
+    applyFilters();
     
-    const areasEncontradas = new Set();
-    const areasBloqueadas = new Set();
-    
-    // Filtrar apenas as áreas permitidas usando comparação normalizada
-    filteredData = allData.filter(person => {
-        const area = person['Área'] || '';
-        const allowed = isAreaAllowed(area);
-        if (allowed) {
-            areasEncontradas.add(area);
-        } else if (area) {
-            areasBloqueadas.add(area);
-        }
-        return allowed;
-    });
-    
-    console.log('✅ Áreas encontradas (permitidas):', [...areasEncontradas]);
-    console.log('❌ Áreas bloqueadas:', [...areasBloqueadas].slice(0, 10), '... total:', areasBloqueadas.size);
-    console.log(`🔒 Filtro restrito aplicado: ${filteredData.length} de ${allData.length} registros`);
-    
-    updateNineBox();
-    updateDashboard();
+    console.log(`🔒 Filtro restrito atualizado: ${filteredData.length} de ${allData.length} registros visíveis`);
 }
 
 function updateRestrictedFilterUI() {
@@ -4067,14 +4049,8 @@ clearFilters = function() {
         document.getElementById('filterGestor').value = '';
     }
     
-    // Se filtro restrito estiver ativo, aplicar ele ao invés de mostrar tudo
-    if (restrictedFilterActive) {
-        applyRestrictedAreaFilter();
-    } else {
-        filteredData = [...allData];
-        updateNineBox();
-        updateDashboard();
-    }
+    // Reaplicar filtros (respeitando a restrição de áreas)
+    applyFilters();
 };
 
 // Override do applyFilters para respeitar o filtro restrito
@@ -4089,13 +4065,12 @@ applyFilters = function() {
     const mesaFilter = document.getElementById('filterMesa')?.value || '';
     const gestorFilter = document.getElementById('filterGestor')?.value || '';
     
-    // Começar com dados base (filtro restrito ou todos)
-    let baseData = restrictedFilterActive 
-        ? allData.filter(person => {
-            const area = person['Área'] || '';
-            return isAreaAllowed(area);
-        })
-        : allData;
+    // Começar com dados base (aplicando filtro de restrição se necessário)
+    // isAreaAllowed já trata a lógica de restrictedFilterActive (se ativo mostra tudo, se inativo esconde restritas)
+    let baseData = allData.filter(person => {
+        const area = person['Área'] || '';
+        return isAreaAllowed(area);
+    });
     
     filteredData = baseData.filter(person => {
         const matchArea = !areaFilter || person['Área'] === areaFilter;
