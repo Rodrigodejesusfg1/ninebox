@@ -3786,12 +3786,7 @@ function exportModifiedCSV() {
 
 // ===== FILTRO RESTRITO (GERÊNCIA GP) =====
 let restrictedFilterActive = false;
-const RESTRICTED_PASSWORD = '@GerenciaGP';
-const RESTRICTED_AREAS = [
-    '001.03.01.1001.02 - COORDENAÇÃO DE COMUNICAÇÃO E MARKETING',
-    '001.03.01.1001.00 - DIRETORIA DE GESTÃO DE PESSOAS E COMUNICAÇÃO',
-    '001.03.01.1001.01 - COORDENAÇÃO DE GESTÃO DE PESSOAS'
-];
+let RESTRICTED_AREAS = []; // Será preenchido pela API após validação
 
 function toggleRestrictedFilterModal() {
     const modal = document.getElementById('restrictedFilterModal');
@@ -3809,9 +3804,15 @@ function closeRestrictedFilterModal() {
     // Limpar senha digitada
     const passInput = document.getElementById('restrictedPassword');
     if (passInput) passInput.value = '';
+    // Limpar status
+    const statusEl = document.getElementById('restrictedFilterStatus');
+    if (statusEl && !restrictedFilterActive) {
+        statusEl.textContent = '';
+        statusEl.className = 'restricted-status';
+    }
 }
 
-function applyRestrictedFilter() {
+async function applyRestrictedFilter() {
     const passInput = document.getElementById('restrictedPassword');
     const statusEl = document.getElementById('restrictedFilterStatus');
     
@@ -3819,27 +3820,59 @@ function applyRestrictedFilter() {
     
     const password = passInput.value;
     
-    if (password === RESTRICTED_PASSWORD) {
-        restrictedFilterActive = true;
-        statusEl.textContent = 'Filtro ativado com sucesso!';
-        statusEl.className = 'restricted-status success';
+    if (!password) {
+        statusEl.textContent = 'Digite a senha!';
+        statusEl.className = 'restricted-status error';
+        return;
+    }
+    
+    statusEl.textContent = 'Validando...';
+    statusEl.className = 'restricted-status';
+    
+    try {
+        // Validar senha via API
+        const response = await fetch(`${API_BASE_URL}/validar-filtro-gp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ senha: password })
+        });
         
-        // Aplicar filtro restrito
-        applyRestrictedAreaFilter();
-        updateRestrictedFilterUI();
+        if (!response.ok) {
+            throw new Error('Erro ao validar senha');
+        }
         
-        // Fechar modal após 1 segundo
-        setTimeout(() => {
-            closeRestrictedFilterModal();
-        }, 1000);
-    } else {
-        statusEl.textContent = 'Senha incorreta!';
+        const result = await response.json();
+        
+        if (result.valido) {
+            restrictedFilterActive = true;
+            RESTRICTED_AREAS = result.areas || [];
+            statusEl.textContent = 'Filtro ativado com sucesso!';
+            statusEl.className = 'restricted-status success';
+            
+            // Aplicar filtro restrito
+            applyRestrictedAreaFilter();
+            updateRestrictedFilterUI();
+            
+            // Fechar modal após 1 segundo
+            setTimeout(() => {
+                closeRestrictedFilterModal();
+            }, 1000);
+        } else {
+            statusEl.textContent = 'Senha incorreta!';
+            statusEl.className = 'restricted-status error';
+        }
+    } catch (error) {
+        console.error('Erro ao validar filtro GP:', error);
+        statusEl.textContent = 'Erro ao validar. Tente novamente.';
         statusEl.className = 'restricted-status error';
     }
 }
 
 function removeRestrictedFilter() {
     restrictedFilterActive = false;
+    RESTRICTED_AREAS = []; // Limpar áreas
     const statusEl = document.getElementById('restrictedFilterStatus');
     if (statusEl) {
         statusEl.textContent = 'Filtro removido.';

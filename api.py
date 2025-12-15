@@ -893,6 +893,53 @@ async def get_filtros():
         logger.error(f"Erro ao buscar filtros: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao buscar filtros: {str(e)}")
 
+class FiltroGPRequest(BaseModel):
+    senha: str
+
+@app.post("/api/validar-filtro-gp")
+async def validar_filtro_gp(request: FiltroGPRequest):
+    """
+    Valida a senha do filtro GP na tabela 'filtrogp'
+    Retorna as áreas permitidas se a senha estiver correta
+    """
+    try:
+        validate_supabase()
+        logger.info("Tentativa de validação do filtro GP...")
+        
+        # Buscar senha na tabela filtrogp
+        resp = (
+            supabase
+            .table("filtrogp")
+            .select("senha")
+            .eq("senha", request.senha)
+            .limit(1)
+            .execute()
+        )
+        
+        if resp.data and len(resp.data) > 0:
+            logger.info("Filtro GP: Senha validada com sucesso")
+            # Áreas permitidas quando a senha está correta
+            areas_permitidas = [
+                "001.03.01.1001.02 - COORDENAÇÃO DE COMUNICAÇÃO E MARKETING",
+                "001.03.01.1001.00 - DIRETORIA DE GESTÃO DE PESSOAS E COMUNICAÇÃO",
+                "001.03.01.1001.01 - COORDENAÇÃO DE GESTÃO DE PESSOAS"
+            ]
+            return {
+                "valido": True,
+                "areas": areas_permitidas
+            }
+        else:
+            logger.info("Filtro GP: Senha inválida")
+            return {
+                "valido": False,
+                "areas": []
+            }
+            
+    except Exception as e:
+        logger.error(f"Erro ao validar filtro GP: {str(e)}")
+        logger.error(f"Stack trace: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Erro ao validar filtro GP: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
